@@ -6,13 +6,31 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		E1D348D12D5176BF0030E1DF /* AuthKey_FLBJ6PK27Z.p8 in Resources */ = {isa = PBXBuildFile; fileRef = E1D348D02D5176BF0030E1DF /* AuthKey_FLBJ6PK27Z.p8 */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		E1CD81772D516AE600FEFCD9 /* simpleWeather.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = simpleWeather.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E1D348D02D5176BF0030E1DF /* AuthKey_FLBJ6PK27Z.p8 */ = {isa = PBXFileReference; lastKnownFileType = text; path = AuthKey_FLBJ6PK27Z.p8; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		E117D5A92D51738900EBCDE2 /* Exceptions for "simpleWeather" folder in "simpleWeather" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = E1CD81762D516AE600FEFCD9 /* simpleWeather */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		E1CD81792D516AE600FEFCD9 /* simpleWeather */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E117D5A92D51738900EBCDE2 /* Exceptions for "simpleWeather" folder in "simpleWeather" target */,
+			);
 			path = simpleWeather;
 			sourceTree = "<group>";
 		};
@@ -34,6 +52,7 @@
 			children = (
 				E1CD81792D516AE600FEFCD9 /* simpleWeather */,
 				E1CD81782D516AE600FEFCD9 /* Products */,
+				E1D348D02D5176BF0030E1DF /* AuthKey_FLBJ6PK27Z.p8 */,
 			);
 			sourceTree = "<group>";
 		};
@@ -78,7 +97,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1610;
-				LastUpgradeCheck = 1610;
+				LastUpgradeCheck = 1620;
 				TargetAttributes = {
 					E1CD81762D516AE600FEFCD9 = {
 						CreatedOnToolsVersion = 16.1;
@@ -109,6 +128,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E1D348D12D5176BF0030E1DF /* AuthKey_FLBJ6PK27Z.p8 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -159,6 +179,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -220,6 +241,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -247,11 +269,13 @@
 				CODE_SIGN_ENTITLEMENTS = simpleWeather/simpleWeather.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"simpleWeather/Preview Content\"";
 				DEVELOPMENT_TEAM = 4QM78MLWEF;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = simpleWeather/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -286,11 +310,13 @@
 				CODE_SIGN_ENTITLEMENTS = simpleWeather/simpleWeather.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"simpleWeather/Preview Content\"";
 				DEVELOPMENT_TEAM = 4QM78MLWEF;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = simpleWeather/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

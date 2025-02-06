@@ -6,12 +6,29 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
-struct simpleWeatherApp: App {
+struct SimpleWeatherApp: App {
+    var sharedModelContainer: ModelContainer?
+
+    init() {
+        do {
+            let schema = Schema([WeatherLocation.self])
+            sharedModelContainer = try ModelContainer(for: schema)
+        } catch {
+            print("⚠️ Error initializing SwiftData ModelContainer: \(error.localizedDescription)")
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if let container = sharedModelContainer {
+                HomeView()
+                    .modelContainer(container)
+            } else {
+                Text("Failed to load data. Please restart the app.")
+            }
         }
     }
 }
