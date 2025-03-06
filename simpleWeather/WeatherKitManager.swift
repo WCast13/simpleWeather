@@ -10,9 +10,9 @@ import WeatherKit
 import CoreLocation
 
 @MainActor
-class WeatherManager {
+class WeatherKitManager: ObservableObject {
     
-    static let shared = WeatherManager()
+    static let shared = WeatherKitManager()
     private let weatherService = WeatherService()
     
     func fetchWeather(latitude: Double, longitude: Double) async throws -> Weather {
