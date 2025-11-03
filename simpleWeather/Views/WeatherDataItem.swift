@@ -8,7 +8,7 @@
 import SwiftUI
 import WeatherKit
 
-struct DetailLineItem<T>: View {
+struct WeatherDataItem<T>: View {
     let title: String
     let dataItem: T
     
