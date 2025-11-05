@@ -7,45 +7,84 @@
 
 import SwiftUI
 import SwiftData
-import CoreLocation
-
 
 struct AddLocationView: View {
-    
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    
-    @State private var locationInput: String = ""
-    @State private var isLoading: Bool = false
-    @State private var errorMessage: String?
-    
+
+    @State private var viewModel: LocationViewModel?
+    @State private var locationInput = ""
+    @FocusState private var isTextFieldFocused: Bool
+
     var body: some View {
         NavigationStack {
-            VStack {
-                TextField("Enter City or Zip Code", text: $locationInput)
-                    .textFieldStyle(.roundedBorder)
-                    .padding()
-                
-                if isLoading {
-                    ProgressView()
-                } else if let errorMessage {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                        .padding()
+            VStack(spacing: 20) {
+                // Search Input Section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Search for a Location")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+
+                    TextField("City name or ZIP code", text: $locationInput)
+                        .textFieldStyle(.roundedBorder)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
+                        .focused($isTextFieldFocused)
+                        .submitLabel(.search)
+                        .onSubmit {
+                            Task {
+                                await addLocation()
+                            }
+                        }
+
+                    Text("Examples: San Francisco, CA or 94102")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                
-                Button("Add Location") {
+                .padding(.horizontal)
+                .padding(.top)
+
+                // Status Section
+                if let viewModel = viewModel, viewModel.isLoading {
+                    VStack(spacing: 12) {
+                        ProgressView()
+                        Text("Searching...")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding()
+                } else if let viewModel = viewModel, let errorMessage = viewModel.errorMessage {
+                    HStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text(errorMessage)
+                            .font(.subheadline)
+                            .multilineTextAlignment(.leading)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.orange.opacity(0.1))
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                }
+
+                // Add Button
+                Button {
                     Task {
                         await addLocation()
                     }
+                } label: {
+                    Label("Add Location", systemImage: "plus.circle.fill")
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .padding()
-                
+                .disabled(locationInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (viewModel?.isLoading ?? false))
+                .padding(.horizontal)
+
                 Spacer()
             }
-            .padding()
             .navigationTitle("Add Location")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -53,57 +92,40 @@ struct AddLocationView: View {
                     }
                 }
             }
+            .onAppear {
+                if viewModel == nil {
+                    let repository = LocationRepository(modelContext: modelContext)
+                    viewModel = LocationViewModel(repository: repository)
+                }
+                isTextFieldFocused = true
+            }
         }
     }
-    
+
+    // MARK: - Private Methods
+
     private func addLocation() async {
-        guard !locationInput.isEmpty else {
+        guard let viewModel = viewModel else { return }
+
+        let trimmedInput = locationInput.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedInput.isEmpty else {
             return
         }
-        
-        isLoading = true
-        errorMessage = nil
-        
-        do {
-            let (latitude, longitude, city, state) = try await geocodeLocation(locationInput)
-            let newLocation = WeatherLocation(city: city, state: state, zipCode: locationInput, latitude: latitude, longitude: longitude)
-            modelContext.insert(newLocation)
+
+        let success = await viewModel.addLocation(query: trimmedInput)
+
+        if success {
+            // Small delay for better UX feedback
+            try? await Task.sleep(for: .milliseconds(200))
             dismiss()
-        } catch {
-            errorMessage = "Could not find location. Please try again."
         }
-        
-        isLoading = false
     }
 }
 
-/// Converts a city/state or ZIP code into coordinates.
-func geocodeLocation(_ address: String) async throws -> (Double, Double, String?, String?) {
-    let geocoder = CLGeocoder()
-    
-    return try await withCheckedThrowingContinuation { continuation in
-        geocoder.geocodeAddressString(address) { placemarks, error in
-            if let error = error {
-                continuation.resume(throwing: error)
-                return
-            }
-            
-            guard let placemark = placemarks?.first,
-                  let location = placemark.location else {
-                continuation.resume(throwing: NSError(domain: "Geocoding", code: 1, userInfo: nil))
-                return
-            }
-            
-            let latitude = location.coordinate.latitude
-            let longitude = location.coordinate.longitude
-            let city = placemark.locality
-            let state = placemark.administrativeArea
-            
-            continuation.resume(returning: (latitude, longitude, city, state))
-        }
-    }
-}
+// MARK: - Preview
 
 #Preview {
     AddLocationView()
+        .modelContainer(for: WeatherLocation.self, inMemory: true)
 }
