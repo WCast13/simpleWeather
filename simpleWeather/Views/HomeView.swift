@@ -19,9 +19,8 @@ struct HomeView: View {
         NavigationStack {
             
             VStack {
-                Text("\(Date.now.formatted(date: .abbreviated, time: .complete))")
-                Text(weatherData.first?.value.currentWeather.date.formatted(date: .abbreviated, time: .complete) ?? "\(Date.now)")
-//                Text("\(weatherData.first?.value.dailyForecast.first?.restOfDayForecast)" ?? "")
+                Text("\(Date.now.formatted(date: .numeric, time: .shortened))")
+                Text(weatherData.first?.value.currentWeather.date.formatted(date: .abbreviated, time: .shortened) ?? "\(Date.now.formatted(date: .abbreviated, time: .shortened))")
                 
                 List {
                     ForEach(locations) { location in
@@ -30,7 +29,7 @@ struct HomeView: View {
                                 VStack(alignment: .leading) {
                                     AppleWeatherRowView(weather: weather, location: location)
                                     ScrollView(.horizontal) {
-                                        DetailsScrollView(weather: weather)
+                                        StandaredRowDetailsView(weather: weather)
                                     }
                                 }
                             }
@@ -49,20 +48,6 @@ struct HomeView: View {
             .toolbar {
                 NavigationLink(destination: AddLocationView()) {
                     Image(systemName: "plus")
-                }
-                
-                Button("Test") {
-                    print("\n\n\n*******************\n\n START HERE \n\n*******************\n\n\n")
-                    print(weatherData.first?.value.dailyForecast ?? "")
-                    print("\n\n")
-                    print(weatherData.first?.value.dailyForecast.count ?? 0)
-                    print("\n\n")
-                    print(weatherData.first?.value.minuteForecast?.first?.date.formatted(date: .abbreviated, time: .complete) ?? Date.now)
-                    print(weatherData.first?.value.minuteForecast?[1].date.formatted(date: .abbreviated, time: .complete) ?? Date.now)
-                    print(weatherData.first?.value.minuteForecast?[4].date.formatted(date: .abbreviated, time: .complete) ?? Date.now)
-                    print(weatherData.first?.value.minuteForecast?[30].date.formatted(date: .abbreviated, time: .complete) ?? Date.now)
-                    print(weatherData.first?.value.minuteForecast?[60].date.formatted(date: .abbreviated, time: .complete) ?? Date.now)
-                    print("\n\n\n*******************\n\n END HERE \n\n*******************\n\n\n")
                 }
             }
         }

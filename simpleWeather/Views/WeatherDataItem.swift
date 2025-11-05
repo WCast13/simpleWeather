@@ -17,7 +17,7 @@ struct WeatherDataItem<T>: View {
         VStack {
             Text(title)
                 .padding(.bottom, 1)
-            Text("\(dataItem)")
+            Text(verbatim: String(describing: dataItem))
         }
         .font(.caption)
     }
