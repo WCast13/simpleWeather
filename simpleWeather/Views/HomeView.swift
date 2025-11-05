@@ -13,9 +13,8 @@ import CoreLocation
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [
-        SortDescriptor(\WeatherLocation.displayOrder),
         SortDescriptor(\WeatherLocation.dateAdded)
-    ]) private var locations: [WeatherLocation]
+    ])  var locations: [WeatherLocation]
 
     @State private var weatherData: [UUID : Weather] = [:]
     @State private var viewModel: LocationViewModel?
@@ -25,6 +24,8 @@ struct HomeView: View {
             VStack {
                 Text("\(Date.now.formatted(date: .numeric, time: .shortened))")
                 Text(weatherData.first?.value.currentWeather.date.formatted(date: .abbreviated, time: .shortened) ?? "\(Date.now.formatted(date: .abbreviated, time: .shortened))")
+                
+                // TODO: Add Segmented Control- List View/MapView
 
                 List {
                     ForEach(locations) { location in
@@ -41,8 +42,8 @@ struct HomeView: View {
                                 Button {
                                     toggleFavorite(location)
                                 } label: {
-                                    Label(location.isFavorite ? "Unfavorite" : "Favorite",
-                                          systemImage: location.isFavorite ? "star.slash" : "star.fill")
+                                    Label(location.isFavorite ?? false ? "Unfavorite" : "Favorite",
+                                          systemImage: location.isFavorite ?? false ? "star.slash" : "star.fill")
                                 }
                                 .tint(.yellow)
                             }
@@ -84,8 +85,8 @@ struct HomeView: View {
     private func fetchWeather(for location: WeatherLocation) async {
         do {
             let weather = try await WeatherKitManager.shared.fetchWeather(
-                latitude: location.latitude,
-                longitude: location.longitude
+                latitude: location.latitude ?? 0.0,
+                longitude: location.longitude ?? 0.0
             )
             weatherData[location.id] = weather
 

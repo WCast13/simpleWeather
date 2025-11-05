@@ -11,32 +11,33 @@ import CoreLocation
 
 @Model
 class WeatherLocation: Identifiable {
-    @Attribute(.unique) var id: UUID
+    var id: UUID = UUID()
     var city: String?
     var state: String?
     var zipCode: String?
-    var latitude: Double
-    var longitude: Double
+    var latitude: Double?
+    var longitude: Double?
 
     // Metadata
-    var dateAdded: Date
+    var dateAdded: Date?
     var lastUpdated: Date?
-    var displayOrder: Int
-    var isFavorite: Bool
+    var displayOrder: Int?
+    var isFavorite: Bool?
 
-    init(city: String? = nil,
+    init(date: Date? = Date(),
+        city: String? = nil,
          state: String? = nil,
          zipCode: String? = nil,
-         latitude: Double,
-         longitude: Double,
-         displayOrder: Int = 0,
-         isFavorite: Bool = false) {
+         latitude: Double? = 0.0,
+         longitude: Double? = 0.0,
+         displayOrder: Int? = 0,
+         isFavorite: Bool? = false) {
         self.id = UUID()
         self.city = city
         self.state = state
         self.zipCode = zipCode
-        self.latitude = latitude
-        self.longitude = longitude
+        self.latitude = latitude ?? 0.0
+        self.longitude = longitude ?? 00
         self.dateAdded = Date()
         self.displayOrder = displayOrder
         self.isFavorite = isFavorite
@@ -55,10 +56,10 @@ class WeatherLocation: Identifiable {
         }
     }
 
-    /// Check if location is close to another (within threshold meters)
-    func isNear(_ other: WeatherLocation, threshold: CLLocationDistance = 1000) -> Bool {
-        let location1 = CLLocation(latitude: latitude, longitude: longitude)
-        let location2 = CLLocation(latitude: other.latitude, longitude: other.longitude)
-        return location1.distance(from: location2) < threshold
-    }
+//    /// Check if location is close to another (within threshold meters)
+//    func isNear(_ other: WeatherLocation, threshold: CLLocationDistance = 1000) -> Bool {
+//        let location1 = CLLocation(latitude: latitude ?? 0.0, longitude: longitude ?? 0.0)
+//        let location2 = CLLocation(latitude: other.latitude ?? 0.0, longitude: other.longitude ?? 0.0)
+//        return location1.distance(from: location2) < threshold
+//    }
 }

@@ -12,12 +12,16 @@ import SwiftData
 @MainActor
 final class LocationRepository {
     private let modelContext: ModelContext
-    private let geocodingService: GeocodingServiceProtocol
 
-    init(modelContext: ModelContext,
-         geocodingService: GeocodingServiceProtocol = GeocodingService()) {
+    init(modelContext: ModelContext){
         self.modelContext = modelContext
-        self.geocodingService = geocodingService
+    }
+
+    /// Convenience factory to construct a repository on the main actor
+    /// Ensures main-actor-isolated dependencies are created safely.
+    @MainActor
+    static func make(modelContext: ModelContext) -> LocationRepository {
+        LocationRepository(modelContext: modelContext)
     }
 
     // MARK: - Fetch Operations
@@ -47,33 +51,28 @@ final class LocationRepository {
     /// - Throws: LocationError if geocoding or saving fails
     func addLocation(query: String) async throws -> WeatherLocation {
         // 1. Geocode the query
-        let result = try await geocodingService.geocode(query)
-
-        // 2. Check for duplicates (within 1km)
-        let existingLocations = try fetchAllLocations()
-        for existing in existingLocations {
-            let tempLocation = WeatherLocation(
-                latitude: result.coordinate.latitude,
-                longitude: result.coordinate.longitude
-            )
-            if tempLocation.isNear(existing, threshold: 1000) {
-                throw LocationError.duplicateLocation
-            }
-        }
-
+        let result = await GeocodeManager(address: query).forwardGeocode(address: query)
+        print(result ?? "No result")
+        
         // 3. Determine if input was a ZIP code
         let zipCode = isZipCode(query) ? query : nil
 
         // 4. Create new location
-        let nextOrder = existingLocations.count
         let newLocation = WeatherLocation(
-            city: result.city,
-            state: result.state,
+            city: result?.addressRepresentations?.cityName,
+            // TODO: Fix Later
+//            state: result?.addressRepresentations?.region?.subRegions.count,
+    
             zipCode: zipCode,
-            latitude: result.coordinate.latitude,
-            longitude: result.coordinate.longitude,
-            displayOrder: nextOrder
+            latitude: result?.location.coordinate.latitude ?? 0.0,
+            longitude: result?.location.coordinate.longitude ?? 0.0,
         )
+        
+        let subRegions = result?.addressRepresentations?.region?.subRegions
+        
+        for place in subRegions ?? [] {
+            print(place.identifier)
+        }
 
         // 5. Save to database
         modelContext.insert(newLocation)
@@ -96,7 +95,7 @@ final class LocationRepository {
 
     /// Toggle favorite status
     func toggleFavorite(_ location: WeatherLocation) {
-        location.isFavorite.toggle()
+        location.isFavorite?.toggle()
         try? modelContext.save()
     }
 
@@ -133,3 +132,4 @@ final class LocationRepository {
         return input.range(of: zipPattern, options: .regularExpression) != nil
     }
 }
+
