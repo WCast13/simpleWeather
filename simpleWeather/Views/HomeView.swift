@@ -15,9 +15,9 @@ struct HomeView: View {
     @Query(sort: [
         SortDescriptor(\WeatherLocation.dateAdded)
     ])  var locations: [WeatherLocation]
-
+    
     @State private var weatherData: [UUID : Weather] = [:]
-
+    
     var body: some View {
         NavigationStack {
             VStack { // TODO: Add Segmented Control- List View/MapView
@@ -72,10 +72,55 @@ struct HomeView: View {
         }
     }
     
+    // MARK: - Private Methods
+    
+    /// Fetch weather for a location
+    private func fetchWeather(for location: WeatherLocation) async {
+        do {
+            let weather = try await WeatherKitManager.shared.fetchWeather(
+                latitude: location.latitude ?? 0.0,
+                longitude: location.longitude ?? 0.0
+            )
+            weatherData[location.id] = weather
+            
+            // Update last updated timestamp
+            location.lastUpdated = Date()
+            try? modelContext.save()
+        } catch {
+            print("Failed to fetch weather: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Delete saved locations
+    private func deleteLocations(at offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(locations[index])
+        }
+        try? modelContext.save()
+    }
+    
+    /// Move/reorder locations
+    private func moveLocations(from source: IndexSet, to destination: Int) {
+        var updatedLocations = locations
+        updatedLocations.move(fromOffsets: source, toOffset: destination)
+        
+        // Update display order for all locations
+        for (index, location) in updatedLocations.enumerated() {
+            location.displayOrder = index
+        }
+        try? modelContext.save()
+    }
+    
+    /// Toggle favorite status
+    private func toggleFavorite(_ location: WeatherLocation) {
+        location.isFavorite = !(location.isFavorite ?? false)
+        try? modelContext.save()
+    }
+    
     func printData() {
         guard let location = locations.first else { return }
         guard let locationData = weatherData[location.id] else { return }
-
+        
         // WeatherKit properties here are non-optional; access them directly
         let currentData = locationData.currentWeather
         
@@ -84,7 +129,7 @@ struct HomeView: View {
         
         let dailyData = locationData.dailyForecast
         guard let dailyFirst = dailyData.first else { return }
-    
+        
         let minuteData = locationData.minuteForecast
         guard let minuteFirst = minuteData?.first else { return }
         
@@ -225,53 +270,8 @@ Dew Point: \(String(format: "%.0f", currentData.dewPoint.converted(to: .fahrenhe
 
 \(dailyFirst.sun.solarMidnight?.formatted(date: .numeric, time: .shortened) ?? "")
 """
-)
+        )
         
-    }
-
-    // MARK: - Private Methods
-
-    /// Fetch weather for a location
-    private func fetchWeather(for location: WeatherLocation) async {
-        do {
-            let weather = try await WeatherKitManager.shared.fetchWeather(
-                latitude: location.latitude ?? 0.0,
-                longitude: location.longitude ?? 0.0
-            )
-            weatherData[location.id] = weather
-
-            // Update last updated timestamp
-            location.lastUpdated = Date()
-            try? modelContext.save()
-        } catch {
-            print("Failed to fetch weather: \(error.localizedDescription)")
-        }
-    }
-
-    /// Delete saved locations
-    private func deleteLocations(at offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(locations[index])
-        }
-        try? modelContext.save()
-    }
-
-    /// Move/reorder locations
-    private func moveLocations(from source: IndexSet, to destination: Int) {
-        var updatedLocations = locations
-        updatedLocations.move(fromOffsets: source, toOffset: destination)
-
-        // Update display order for all locations
-        for (index, location) in updatedLocations.enumerated() {
-            location.displayOrder = index
-        }
-        try? modelContext.save()
-    }
-
-    /// Toggle favorite status
-    private func toggleFavorite(_ location: WeatherLocation) {
-        location.isFavorite = !(location.isFavorite ?? false)
-        try? modelContext.save()
     }
 }
 
