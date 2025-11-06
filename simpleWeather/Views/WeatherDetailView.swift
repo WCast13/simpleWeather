@@ -250,10 +250,3 @@ struct DailyForecastRow: View {
         .padding(.vertical, 8)
     }
 }
-
-// Preview
-//struct WeatherDetailView_Previews: PreviewProvider {
-//    static var previews: some View {
-//        WeatherDetailView(weatherManager: WeatherKitManager(), locationName: "New York, NY")
-//    }
-//}

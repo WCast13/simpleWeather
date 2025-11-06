@@ -56,7 +56,7 @@ struct StandardRowView: View {
             Spacer()
             
             VStack(alignment: .center) {
-                Text("\(String(format: "%.0f", weather.currentWeather.temperature.converted(to: .fahrenheit).value))°F")
+                Text("\(String(format: "%.0f", weather.currentWeather.temperature.converted(to: .fahrenheit).description))")
                     .font(.body)
                 Spacer()
                 Image(systemName: weather.currentWeather.symbolName)
