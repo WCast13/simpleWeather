@@ -32,9 +32,7 @@ struct HomeView: View {
                             NavigationLink(destination: WeatherDetailView(weather: weather, location: location)) {
                                 VStack(alignment: .leading) {
                                     AppleWeatherRowView(weather: weather, location: location)
-                                    ScrollView(.horizontal) {
-                                        StandaredRowDetailsView(weather: weather)
-                                    }
+                                    StandaredRowDetailsView(weather: weather)
                                 }
                             }
                             .swipeActions(edge: .leading) {
@@ -56,6 +54,13 @@ struct HomeView: View {
                     }
                     .onDelete(perform: deleteLocations)
                     .onMove(perform: moveLocations)
+                }
+                .onAppear {
+                    print("Started")
+                    Task {
+                        await WeatherKitManager.shared.fetchWeatherSummary(latitude: 0.0, longitude: 0.0)
+                        await WeatherKitManager.shared.fetchWeatherSumary(latitude: 0.0, longitude: 0.0)
+                    }
                 }
             }
             .navigationTitle("SimpleWeather")
@@ -277,4 +282,35 @@ Dew Point: \(String(format: "%.0f", currentData.dewPoint.converted(to: .fahrenhe
 
 #Preview {
     HomeView()
+        .modelContainer(for: WeatherLocation.self, inMemory: true) { result in
+            guard case .success(let container) = result else {
+                fatalError("Failed to create model container for preview")
+            }
+
+            let context = container.mainContext
+
+            // Add San Francisco
+            let sanFrancisco = WeatherLocation(
+                city: "San Francisco",
+                state: "CA",
+                latitude: 37.7749,
+                longitude: -122.4194
+            )
+            sanFrancisco.displayOrder = 0
+            sanFrancisco.isFavorite = true
+            context.insert(sanFrancisco)
+
+            // Add New York
+            let newYork = WeatherLocation(
+                city: "New York",
+                state: "NY",
+                latitude: 40.7128,
+                longitude: -74.0060
+            )
+            newYork.displayOrder = 1
+            newYork.isFavorite = false
+            context.insert(newYork)
+
+            try? context.save()
+        }
 }

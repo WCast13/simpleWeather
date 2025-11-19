@@ -128,6 +128,11 @@ struct WeatherDetailView: View {
             }
             .padding(.vertical)
         }
+        .onAppear() {
+            print(weather.currentWeather.cloudCoverByAltitude.high.description)
+            print(weather.currentWeather.cloudCoverByAltitude.medium.description)
+            print(weather.currentWeather.cloudCoverByAltitude.low.description)
+        }
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -248,5 +253,126 @@ struct DailyForecastRow: View {
             }
         }
         .padding(.vertical, 8)
+    }
+}
+
+// MARK: - Previews
+
+// Preview helper to load weather data
+struct WeatherPreviewWrapper: View {
+    @State private var weather: Weather?
+    @State private var isLoading = true
+
+    let location: WeatherLocation
+
+    var body: some View {
+        Group {
+            if isLoading {
+                ProgressView("Loading weather data...")
+            } else if let weather = weather {
+                WeatherDetailView(weather: weather, location: location)
+            } else {
+                Text("Failed to load weather data")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .task {
+            await loadWeather()
+        }
+    }
+
+    private func loadWeather() async {
+        do {
+            weather = try await WeatherKitManager.shared.fetchWeather(
+                latitude: location.latitude ?? 0.0,
+                longitude: location.longitude ?? 0.0
+            )
+            isLoading = false
+        } catch {
+            print("Preview error: \(error)")
+            isLoading = false
+        }
+    }
+}
+
+#Preview("Weather Detail View") {
+    NavigationStack {
+        WeatherPreviewWrapper(
+            location: WeatherLocation(
+                city: "San Francisco",
+                state: "CA",
+                latitude: 37.7749,
+                longitude: -122.4194
+            )
+        )
+    }
+}
+
+#Preview("Hourly Forecast Card") {
+    HourlyForecastCardPreview()
+}
+
+#Preview("Weather Metric Card") {
+    WeatherMetricCard(
+        title: "Humidity",
+        value: "65%",
+        icon: "humidity"
+    )
+    .padding()
+    .frame(width: 200)
+}
+
+#Preview("Daily Forecast Row") {
+    DailyForecastRowPreview()
+}
+
+// MARK: - Component Preview Helpers
+private struct HourlyForecastCardPreview: View {
+    @State private var weather: Weather?
+
+    var body: some View {
+        Group {
+            if let hourWeather = weather?.hourlyForecast.first {
+                HourlyForecastCard(hourWeather: hourWeather)
+                    .padding()
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            do {
+                weather = try await WeatherKitManager.shared.fetchWeather(
+                    latitude: 37.7749,
+                    longitude: -122.4194
+                )
+            } catch {
+                print("Preview error: \(error)")
+            }
+        }
+    }
+}
+
+private struct DailyForecastRowPreview: View {
+    @State private var weather: Weather?
+
+    var body: some View {
+        Group {
+            if let dailyWeather = weather?.dailyForecast.first {
+                DailyForecastRow(dailyWeather: dailyWeather)
+                    .padding()
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            do {
+                weather = try await WeatherKitManager.shared.fetchWeather(
+                    latitude: 37.7749,
+                    longitude: -122.4194
+                )
+            } catch {
+                print("Preview error: \(error)")
+            }
+        }
     }
 }
