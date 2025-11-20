@@ -17,7 +17,8 @@ struct HomeView: View {
     ])  var locations: [WeatherLocation]
     
     @State private var weatherData: [UUID : Weather] = [:]
-    
+    @AppStorage("showWeatherGrid") private var showWeatherGrid: Bool = true
+
     var body: some View {
         NavigationStack {
             VStack { // TODO: Add Segmented Control- List View/MapView
@@ -32,7 +33,9 @@ struct HomeView: View {
                             NavigationLink(destination: WeatherDetailView(weather: weather, location: location)) {
                                 VStack(alignment: .leading) {
                                     AppleWeatherRowView(weather: weather, location: location)
-                                    StandaredRowDetailsView(weather: weather)
+                                    if showWeatherGrid {
+                                        StandaredRowDetailsView(weather: weather)
+                                    }
                                 }
                             }
                             .swipeActions(edge: .leading) {
@@ -72,6 +75,13 @@ struct HomeView: View {
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     EditButton()
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showWeatherGrid.toggle()
+                    } label: {
+                        Image(systemName: showWeatherGrid ? "square.grid.3x3.fill" : "square.grid.3x3")
+                    }
                 }
             }
         }

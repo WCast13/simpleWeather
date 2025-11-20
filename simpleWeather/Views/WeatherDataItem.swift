@@ -22,3 +22,14 @@ struct WeatherDataItem<T>: View {
         .font(.caption)
     }
 }
+
+// MARK: - Preview
+#Preview {
+    VStack(spacing: 20) {
+        WeatherDataItem(title: "Temperature", dataItem: 72.5)
+        WeatherDataItem(title: "Humidity", dataItem: "65%")
+        WeatherDataItem(title: "Wind Speed", dataItem: 12)
+        WeatherDataItem(title: "Condition", dataItem: "Partly Cloudy")
+    }
+    .padding()
+}

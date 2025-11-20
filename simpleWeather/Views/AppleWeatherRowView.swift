@@ -43,3 +43,42 @@ struct AppleWeatherRowView: View {
         }
     }
 }
+
+// MARK: - Preview
+#Preview {
+    AppleWeatherRowViewPreview()
+}
+
+private struct AppleWeatherRowViewPreview: View {
+    @State private var weather: Weather?
+
+    var body: some View {
+        Group {
+            if let weather = weather {
+                List {
+                    AppleWeatherRowView(
+                        weather: weather,
+                        location: WeatherLocation(
+                            city: "San Francisco",
+                            state: "CA",
+                            latitude: 37.7749,
+                            longitude: -122.4194
+                        )
+                    )
+                }
+            } else {
+                ProgressView("Loading weather data...")
+            }
+        }
+        .task {
+            do {
+                weather = try await WeatherKitManager.shared.fetchWeather(
+                    latitude: 37.7749,
+                    longitude: -122.4194
+                )
+            } catch {
+                print("Preview error: \(error)")
+            }
+        }
+    }
+}
