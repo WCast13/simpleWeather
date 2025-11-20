@@ -35,8 +35,13 @@ struct HomeView: View {
                                     AppleWeatherRowView(weather: weather, location: location)
                                     if showWeatherGrid {
                                         StandaredRowDetailsView(weather: weather)
+                                            .transition(.asymmetric(
+                                                insertion: .opacity.combined(with: .move(edge: .top)),
+                                                removal: .opacity.combined(with: .move(edge: .top))
+                                            ))
                                     }
                                 }
+                                .animation(.easeInOut(duration: 0.3), value: showWeatherGrid)
                             }
                             .swipeActions(edge: .leading) {
                                 Button {
@@ -78,9 +83,12 @@ struct HomeView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        showWeatherGrid.toggle()
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showWeatherGrid.toggle()
+                        }
                     } label: {
                         Image(systemName: showWeatherGrid ? "square.grid.3x3.fill" : "square.grid.3x3")
+                            .contentTransition(.symbolEffect(.replace))
                     }
                 }
             }
