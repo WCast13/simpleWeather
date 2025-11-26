@@ -10,38 +10,92 @@ import SwiftData
 import WeatherKit
 import CoreLocation
 
+enum WeatherDataType: String, CaseIterable {
+    case current = "Current"
+    case hourly = "Hourly"
+    case daily = "Daily"
+}
+
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [
         SortDescriptor(\WeatherLocation.dateAdded)
     ])  var locations: [WeatherLocation]
-    
+
     @State private var weatherData: [UUID : Weather] = [:]
     @AppStorage("showWeatherGrid") private var showWeatherGrid: Bool = true
+    @State private var selectedDataType: WeatherDataType = .current
+    @State private var hourlyIndex: Int = 0
+    @State private var dailyIndex: Int = 0
 
     var body: some View {
         NavigationStack {
-            VStack { // TODO: Add Segmented Control- List View/MapView
+            VStack(spacing: 0) {
+                // Segmented Control
+                Picker("Weather Data Type", selection: $selectedDataType) {
+                    ForEach(WeatherDataType.allCases, id: \.self) { type in
+                        Text(type.rawValue).tag(type)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .onChange(of: selectedDataType) { oldValue, newValue in
+                    // Reset indices when switching data types
+                    hourlyIndex = 0
+                    dailyIndex = 0
+                }
+
+                // Time Slider (only shown for hourly and daily)
+                if selectedDataType != .current {
+                    timeSliderView
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
                 List {
                     
-                    Button("Data Params") {
-                        printData()
-                    }
+//                    Button("Data Params") {
+//                        printData()
+//                    }
                     
                     ForEach(locations) { location in
                         if let weather = weatherData[location.id] {
                             NavigationLink(destination: WeatherDetailView(weather: weather, location: location)) {
                                 VStack(alignment: .leading) {
-                                    AppleWeatherRowView(weather: weather, location: location)
+                                    let displayData = weatherForDisplay(weather)
+                                    let dateLabel = selectedDataType != .current ? timeLabel(for: selectedDataType == .hourly ? hourlyIndex : dailyIndex, dataType: selectedDataType, weather: weather) : nil
+
+                                    AdaptiveWeatherRowView(
+                                        location: location,
+                                        temperature: displayData.temperature,
+                                        condition: displayData.condition,
+                                        high: displayData.high,
+                                        low: displayData.low,
+                                        symbolName: displayData.symbolName,
+                                        date: dateLabel
+                                    )
+
                                     if showWeatherGrid {
-                                        StandaredRowDetailsView(weather: weather)
-                                            .transition(.asymmetric(
-                                                insertion: .opacity.combined(with: .move(edge: .top)),
-                                                removal: .opacity.combined(with: .move(edge: .top))
-                                            ))
+                                        let gridData = gridWeatherData(weather)
+                                        AdaptiveWeatherGridView(
+                                            wind: gridData.wind,
+                                            humidity: gridData.humidity,
+                                            cloudCover: gridData.cloudCover,
+                                            uvIndex: gridData.uvIndex,
+                                            visibility: gridData.visibility,
+                                            pressure: gridData.pressure,
+                                            apparentTemperature: gridData.currentWeather.apparentTemperature
+                                        )
+                                        .transition(.asymmetric(
+                                            insertion: .opacity.combined(with: .move(edge: .top)),
+                                            removal: .opacity.combined(with: .move(edge: .top))
+                                        ))
                                     }
                                 }
                                 .animation(.easeInOut(duration: 0.3), value: showWeatherGrid)
+                                .animation(.easeInOut(duration: 0.3), value: selectedDataType)
+                                .animation(.easeInOut(duration: 0.2), value: hourlyIndex)
+                                .animation(.easeInOut(duration: 0.2), value: dailyIndex)
                             }
                             .swipeActions(edge: .leading) {
                                 Button {
@@ -94,7 +148,47 @@ struct HomeView: View {
             }
         }
     }
-    
+
+    // MARK: - Time Slider View
+
+    private var timeSliderView: some View {
+        VStack(spacing: 8) {
+            if selectedDataType == .hourly {
+                if let firstWeather = weatherData.values.first {
+                    let maxIndex = max(0, firstWeather.hourlyForecast.count - 1)
+                    VStack(spacing: 4) {
+                        Text(timeLabel(for: hourlyIndex, dataType: .hourly, weather: firstWeather))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Slider(value: Binding(
+                            get: { Double(hourlyIndex) },
+                            set: { hourlyIndex = Int($0) }
+                        ), in: 0...Double(maxIndex), step: 1)
+                        .padding(.horizontal)
+                    }
+                }
+            } else if selectedDataType == .daily {
+                if let firstWeather = weatherData.values.first {
+                    let maxIndex = max(0, firstWeather.dailyForecast.count - 1)
+                    VStack(spacing: 4) {
+                        Text(timeLabel(for: dailyIndex, dataType: .daily, weather: firstWeather))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Slider(value: Binding(
+                            get: { Double(dailyIndex) },
+                            set: { dailyIndex = Int($0) }
+                        ), in: 0...Double(maxIndex), step: 1)
+                        .padding(.horizontal)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 8)
+        .animation(.easeInOut(duration: 0.3), value: selectedDataType)
+    }
+
     // MARK: - Private Methods
     
     /// Fetch weather for a location
@@ -139,7 +233,89 @@ struct HomeView: View {
         location.isFavorite = !(location.isFavorite ?? false)
         try? modelContext.save()
     }
-    
+
+    /// Get time label for slider
+    private func timeLabel(for index: Int, dataType: WeatherDataType, weather: Weather) -> String {
+        switch dataType {
+        case .hourly:
+            guard index < weather.hourlyForecast.count else { return "" }
+            let hourWeather = weather.hourlyForecast[index]
+            let formatter = DateFormatter()
+            formatter.dateFormat = "E, MMM d 'at' h:mm a"
+            return formatter.string(from: hourWeather.date)
+        case .daily:
+            guard index < weather.dailyForecast.count else { return "" }
+            let dayWeather = weather.dailyForecast[index]
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEEE, MMM d"
+            return formatter.string(from: dayWeather.date)
+        case .current:
+            return "Current"
+        }
+    }
+
+    /// Get weather data for display based on selected type
+    private func weatherForDisplay(_ weather: Weather) -> (temperature: String, condition: String, high: String, low: String, symbolName: String) {
+        switch selectedDataType {
+        case .current:
+            let current = weather.currentWeather
+            let high = weather.dailyForecast.first?.highTemperature.converted(to: .fahrenheit).value ?? 0
+            let low = weather.dailyForecast.first?.lowTemperature.converted(to: .fahrenheit).value ?? 0
+            return (
+                temperature: "\(Int(current.temperature.converted(to: .fahrenheit).value))°",
+                condition: current.condition.description,
+                high: "H: \(Int(high))°",
+                low: "L: \(Int(low))°",
+                symbolName: current.symbolName
+            )
+        case .hourly:
+            guard hourlyIndex < weather.hourlyForecast.count else {
+                return ("--°", "No data", "H: --°", "L: --°", "questionmark")
+            }
+            let hourWeather = weather.hourlyForecast[hourlyIndex]
+            return (
+                temperature: "\(Int(hourWeather.temperature.converted(to: .fahrenheit).value))°",
+                condition: hourWeather.condition.description,
+                high: "Precip: \(Int(hourWeather.precipitationChance * 100))%",
+                low: "",
+                symbolName: hourWeather.symbolName
+            )
+        case .daily:
+            guard dailyIndex < weather.dailyForecast.count else {
+                return ("--°", "No data", "H: --°", "L: --°", "questionmark")
+            }
+            let dayWeather = weather.dailyForecast[dailyIndex]
+            return (
+                temperature: "\(Int(dayWeather.highTemperature.converted(to: .fahrenheit).value))°",
+                condition: dayWeather.condition.description,
+                high: "H: \(Int(dayWeather.highTemperature.converted(to: .fahrenheit).value))°",
+                low: "L: \(Int(dayWeather.lowTemperature.converted(to: .fahrenheit).value))°",
+                symbolName: dayWeather.symbolName
+            )
+        }
+    }
+
+    /// Get grid weather data based on selected type
+    private func gridWeatherData(_ weather: Weather) -> (currentWeather: CurrentWeather, wind: Wind, humidity: Double, cloudCover: Double, uvIndex: UVIndex, visibility: Measurement<UnitLength>, pressure: Measurement<UnitPressure>) {
+        switch selectedDataType {
+        case .current:
+            let current = weather.currentWeather
+            return (current, current.wind, current.humidity, current.cloudCover, current.uvIndex, current.visibility, current.pressure)
+        case .hourly:
+            guard hourlyIndex < weather.hourlyForecast.count else {
+                let current = weather.currentWeather
+                return (current, current.wind, current.humidity, current.cloudCover, current.uvIndex, current.visibility, current.pressure)
+            }
+            let hourWeather = weather.hourlyForecast[hourlyIndex]
+            // HourWeather doesn't have all properties, so we return a mix
+            return (weather.currentWeather, hourWeather.wind, hourWeather.humidity, hourWeather.cloudCover, hourWeather.uvIndex, hourWeather.visibility, hourWeather.pressure)
+        case .daily:
+            // Daily doesn't have detailed current conditions, use current weather
+            let current = weather.currentWeather
+            return (current, current.wind, current.humidity, current.cloudCover, current.uvIndex, current.visibility, current.pressure)
+        }
+    }
+
     func printData() {
         guard let location = locations.first else { return }
         guard let locationData = weatherData[location.id] else { return }

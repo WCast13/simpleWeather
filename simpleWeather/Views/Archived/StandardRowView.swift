@@ -65,7 +65,3 @@ struct StandardRowView: View {
         }
     }
 }
-
-//#Preview {
-//    StandardRowView()
-//}
