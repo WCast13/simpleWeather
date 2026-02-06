@@ -47,10 +47,10 @@ struct HomeView: View {
                 }
 
                 // Time Slider (only shown for hourly and daily)
-                if selectedDataType != .current {
-                    timeSliderView
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
+//                if selectedDataType != .current {
+//                    timeSliderView
+//                        .transition(.opacity.combined(with: .move(edge: .top)))
+//                }
 
                 List {
                     
@@ -121,7 +121,7 @@ struct HomeView: View {
                     print("Started")
                     Task {
                         await WeatherKitManager.shared.fetchWeatherSummary(latitude: 0.0, longitude: 0.0)
-                        await WeatherKitManager.shared.fetchWeatherSumary(latitude: 0.0, longitude: 0.0)
+//                        await WeatherKitManager.shared.fetchWeatherSumary(latitude: 0.0, longitude: 0.0)
                     }
                 }
             }
@@ -151,43 +151,43 @@ struct HomeView: View {
 
     // MARK: - Time Slider View
 
-    private var timeSliderView: some View {
-        VStack(spacing: 8) {
-            if selectedDataType == .hourly {
-                if let firstWeather = weatherData.values.first {
-                    let maxIndex = max(0, firstWeather.hourlyForecast.count - 1)
-                    VStack(spacing: 4) {
-                        Text(timeLabel(for: hourlyIndex, dataType: .hourly, weather: firstWeather))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        Slider(value: Binding(
-                            get: { Double(hourlyIndex) },
-                            set: { hourlyIndex = Int($0) }
-                        ), in: 0...Double(maxIndex), step: 1)
-                        .padding(.horizontal)
-                    }
-                }
-            } else if selectedDataType == .daily {
-                if let firstWeather = weatherData.values.first {
-                    let maxIndex = max(0, firstWeather.dailyForecast.count - 1)
-                    VStack(spacing: 4) {
-                        Text(timeLabel(for: dailyIndex, dataType: .daily, weather: firstWeather))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        Slider(value: Binding(
-                            get: { Double(dailyIndex) },
-                            set: { dailyIndex = Int($0) }
-                        ), in: 0...Double(maxIndex), step: 1)
-                        .padding(.horizontal)
-                    }
-                }
-            }
-        }
-        .padding(.vertical, 8)
-        .animation(.easeInOut(duration: 0.3), value: selectedDataType)
-    }
+//    private var timeSliderView: some View {
+//        VStack(spacing: 8) {
+//            if selectedDataType == .hourly {
+//                if let firstWeather = weatherData.values.first {
+//                    let maxIndex = max(0, firstWeather.hourlyForecast.count - 1)
+//                    VStack(spacing: 4) {
+//                        Text(timeLabel(for: hourlyIndex, dataType: .hourly, weather: firstWeather))
+//                            .font(.caption)
+//                            .foregroundStyle(.secondary)
+//
+//                        Slider(value: Binding(
+//                            get: { Double(hourlyIndex) },
+//                            set: { hourlyIndex = Int($0) }
+//                        ), in: 0...Double(maxIndex), step: 1)
+//                        .padding(.horizontal)
+//                    }
+//                }
+//            } else if selectedDataType == .daily {
+//                if let firstWeather = weatherData.values.first {
+//                    let maxIndex = max(0, firstWeather.dailyForecast.count - 1)
+//                    VStack(spacing: 4) {
+//                        Text(timeLabel(for: dailyIndex, dataType: .daily, weather: firstWeather))
+//                            .font(.caption)
+//                            .foregroundStyle(.secondary)
+//
+//                        Slider(value: Binding(
+//                            get: { Double(dailyIndex) },
+//                            set: { dailyIndex = Int($0) }
+//                        ), in: 0...Double(maxIndex), step: 1)
+//                        .padding(.horizontal)
+//                    }
+//                }
+//            }
+//        }
+//        .padding(.vertical, 8)
+//        .animation(.easeInOut(duration: 0.3), value: selectedDataType)
+//    }
 
     // MARK: - Private Methods
     
@@ -315,7 +315,28 @@ struct HomeView: View {
             return (current, current.wind, current.humidity, current.cloudCover, current.uvIndex, current.visibility, current.pressure)
         }
     }
-
+    
+    private func gridWeatherData2(_ weather: Weather) -> (CurrentWeather?, HourWeather?, DayWeather?) {
+        switch selectedDataType {
+        case .current:
+            let current = weather.currentWeather
+            return (current, nil, nil)
+        case .hourly:
+            guard hourlyIndex < weather.hourlyForecast.count else {
+                let current = weather.currentWeather
+                return (current, nil, nil)
+            }
+            let hourWeather = weather.hourlyForecast[hourlyIndex]
+            // HourWeather doesn't have all properties, so we return a mix
+            return (nil, hourWeather, nil)
+        case .daily:
+            // Daily doesn't have detailed current conditions, use current weather
+            let dayWeather = weather.dailyForecast[1]
+            print(dayWeather)
+            return (nil, nil, dayWeather)
+        }
+    }
+    
     func printData() {
         guard let location = locations.first else { return }
         guard let locationData = weatherData[location.id] else { return }
