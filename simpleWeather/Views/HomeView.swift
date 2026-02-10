@@ -27,6 +27,7 @@ struct HomeView: View {
     @State private var selectedDataType: WeatherDataType = .current
     @State private var hourlyIndex: Int = 0
     @State private var dailyIndex: Int = 0
+    @State private var showingTimePicker: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -46,11 +47,11 @@ struct HomeView: View {
                     dailyIndex = 0
                 }
 
-                // Time Slider (only shown for hourly and daily)
-//                if selectedDataType != .current {
-//                    timeSliderView
-//                        .transition(.opacity.combined(with: .move(edge: .top)))
-//                }
+                // Time Selector Button (only shown for hourly and daily)
+                if selectedDataType != .current {
+                    timePickerButton
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
 
                 List {
                     
@@ -126,6 +127,9 @@ struct HomeView: View {
                 }
             }
             .navigationTitle("SimpleWeather")
+            .sheet(isPresented: $showingTimePicker) {
+                timePickerSheet
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink(destination: AddLocationView()) {
@@ -149,48 +153,107 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Time Slider View
+    // MARK: - Time Picker Button
 
-//    private var timeSliderView: some View {
-//        VStack(spacing: 8) {
-//            if selectedDataType == .hourly {
-//                if let firstWeather = weatherData.values.first {
-//                    let maxIndex = max(0, firstWeather.hourlyForecast.count - 1)
-//                    VStack(spacing: 4) {
-//                        Text(timeLabel(for: hourlyIndex, dataType: .hourly, weather: firstWeather))
-//                            .font(.caption)
-//                            .foregroundStyle(.secondary)
-//
-//                        Slider(value: Binding(
-//                            get: { Double(hourlyIndex) },
-//                            set: { hourlyIndex = Int($0) }
-//                        ), in: 0...Double(maxIndex), step: 1)
-//                        .padding(.horizontal)
-//                    }
-//                }
-//            } else if selectedDataType == .daily {
-//                if let firstWeather = weatherData.values.first {
-//                    let maxIndex = max(0, firstWeather.dailyForecast.count - 1)
-//                    VStack(spacing: 4) {
-//                        Text(timeLabel(for: dailyIndex, dataType: .daily, weather: firstWeather))
-//                            .font(.caption)
-//                            .foregroundStyle(.secondary)
-//
-//                        Slider(value: Binding(
-//                            get: { Double(dailyIndex) },
-//                            set: { dailyIndex = Int($0) }
-//                        ), in: 0...Double(maxIndex), step: 1)
-//                        .padding(.horizontal)
-//                    }
-//                }
-//            }
-//        }
-//        .padding(.vertical, 8)
-//        .animation(.easeInOut(duration: 0.3), value: selectedDataType)
-//    }
+    private var timePickerButton: some View {
+        Button {
+            showingTimePicker = true
+        } label: {
+            HStack {
+//                Image(systemName: selectedDataType == .hourly ? "clock" : "calendar")
+                Text(currentTimeLabel)
+                    .font(.subheadline)
+                Image(systemName: "chevron.down")
+                    .font(.caption)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color(.systemGray6))
+            .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Time Picker Sheet
+
+    private var timePickerSheet: some View {
+        NavigationStack {
+            VStack {
+                if selectedDataType == .hourly {
+                    if let firstWeather = weatherData.values.first {
+                        Picker("Select Hour", selection: $hourlyIndex) {
+                            ForEach(Array(firstWeather.hourlyForecast.enumerated()), id: \.offset) { index, hourWeather in
+                                Text(timeLabel(for: index, dataType: .hourly, weather: firstWeather))
+                                    .tag(index)
+                            }
+                        }
+                        .pickerStyle(.wheel)
+                    }
+                } else if selectedDataType == .daily {
+                    if let firstWeather = weatherData.values.first {
+                        Picker("Select Day", selection: $dailyIndex) {
+                            ForEach(Array(firstWeather.dailyForecast.enumerated()), id: \.offset) { index, dayWeather in
+                                Text(timeLabel(for: index, dataType: .daily, weather: firstWeather))
+                                    .tag(index)
+                            }
+                        }
+                        .pickerStyle(.wheel)
+                    }
+                }
+            }
+            .navigationTitle(selectedDataType == .hourly ? "Select Hour" : "Select Day")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        showingTimePicker = false
+                    }
+                }
+            }
+        }
+        .presentationDetents([.height(300)])
+    }
+
+    // MARK: - Helper Properties
+
+    private var currentTimeLabel: String {
+        guard let firstWeather = weatherData.values.first else {
+            return selectedDataType == .hourly ? "Select Hour" : "Select Day"
+        }
+
+        if selectedDataType == .hourly {
+            guard hourlyIndex < firstWeather.hourlyForecast.count else {
+                return "Select Hour"
+            }
+            let hourWeather = firstWeather.hourlyForecast[hourlyIndex]
+//            return hourWeather.date.formatted(date: .omitted, time: .shortened)
+            return formatButtonDate(hourWeather.date, isHourly: true)
+        } else {
+            guard dailyIndex < firstWeather.dailyForecast.count else {
+                return "Select Day"
+            }
+            let dayWeather = firstWeather.dailyForecast[dailyIndex]
+            return formatButtonDate(dayWeather.date, isHourly: false)
+        }
+    }
 
     // MARK: - Private Methods
-    
+
+    // MARK: Date Formatting Helpers
+
+    /// Format date for the button display
+    private func formatButtonDate(_ date: Date, isHourly: Bool) -> String {
+        let formatter = DateFormatter()
+        if isHourly {
+            formatter.dateFormat = "h:mm a"
+        } else {
+            formatter.dateFormat = "EEEE, MMM d"
+        }
+        return formatter.string(from: date)
+    }
+
     /// Fetch weather for a location
     private func fetchWeather(for location: WeatherLocation) async {
         do {
