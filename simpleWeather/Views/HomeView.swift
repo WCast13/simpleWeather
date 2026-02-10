@@ -54,11 +54,6 @@ struct HomeView: View {
                 }
 
                 List {
-                    
-//                    Button("Data Params") {
-//                        printData()
-//                    }
-                    
                     ForEach(locations) { location in
                         if let weather = weatherData[location.id] {
                             NavigationLink(destination: WeatherDetailView(weather: weather, location: location)) {
@@ -119,10 +114,8 @@ struct HomeView: View {
                     .onMove(perform: moveLocations)
                 }
                 .onAppear {
-                    print("Started")
                     Task {
                         await WeatherKitManager.shared.fetchWeatherSummary(latitude: 0.0, longitude: 0.0)
-//                        await WeatherKitManager.shared.fetchWeatherSumary(latitude: 0.0, longitude: 0.0)
                     }
                 }
             }
@@ -160,7 +153,6 @@ struct HomeView: View {
             showingTimePicker = true
         } label: {
             HStack {
-//                Image(systemName: selectedDataType == .hourly ? "clock" : "calendar")
                 Text(currentTimeLabel)
                     .font(.subheadline)
                 Image(systemName: "chevron.down")
@@ -228,7 +220,6 @@ struct HomeView: View {
                 return "Select Hour"
             }
             let hourWeather = firstWeather.hourlyForecast[hourlyIndex]
-//            return hourWeather.date.formatted(date: .omitted, time: .shortened)
             return formatButtonDate(hourWeather.date, isHourly: true)
         } else {
             guard dailyIndex < firstWeather.dailyForecast.count else {
