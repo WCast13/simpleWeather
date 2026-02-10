@@ -28,6 +28,8 @@ struct HomeView: View {
     @State private var hourlyIndex: Int = 0
     @State private var dailyIndex: Int = 0
     @State private var showingTimePicker: Bool = false
+    @State private var selectedDay: Date = Date()
+    @State private var selectedHourOfDay: Int = 0
 
     var body: some View {
         NavigationStack {
@@ -175,13 +177,43 @@ struct HomeView: View {
             VStack {
                 if selectedDataType == .hourly {
                     if let firstWeather = weatherData.values.first {
-                        Picker("Select Hour", selection: $hourlyIndex) {
-                            ForEach(Array(firstWeather.hourlyForecast.enumerated()), id: \.offset) { index, hourWeather in
-                                Text(timeLabel(for: index, dataType: .hourly, weather: firstWeather))
-                                    .tag(index)
+                        let uniqueDays = getUniqueDays(from: firstWeather)
+                        let hoursInDay = getHoursForDay(selectedDay, from: firstWeather)
+
+                        HStack(spacing: 0) {
+                            // Day Picker
+                            Picker("Day", selection: $selectedDay) {
+                                ForEach(uniqueDays, id: \.self) { day in
+                                    Text(day.formatted(.dateTime.weekday(.wide)))
+                                        .tag(day)
+                                }
+                            }
+                            .pickerStyle(.wheel)
+                            .onChange(of: selectedDay) { oldValue, newValue in
+                                // Reset to first hour of the new day
+                                let hours = getHoursForDay(newValue, from: firstWeather)
+                                if let firstHour = hours.first {
+                                    selectedHourOfDay = Calendar.current.component(.hour, from: firstHour.date)
+                                    updateHourlyIndex(from: firstWeather)
+                                }
+                            }
+
+                            // Hour Picker
+                            Picker("Hour", selection: $selectedHourOfDay) {
+                                ForEach(hoursInDay, id: \.date) { hourWeather in
+                                    let hour = Calendar.current.component(.hour, from: hourWeather.date)
+                                    Text(hourWeather.date.formatted(.dateTime.hour()))
+                                        .tag(hour)
+                                }
+                            }
+                            .pickerStyle(.wheel)
+                            .onChange(of: selectedHourOfDay) { oldValue, newValue in
+                                updateHourlyIndex(from: firstWeather)
                             }
                         }
-                        .pickerStyle(.wheel)
+                        .onAppear {
+                            initializeHourlyPicker(from: firstWeather)
+                        }
                     }
                 } else if selectedDataType == .daily {
                     if let firstWeather = weatherData.values.first {
@@ -236,13 +268,76 @@ struct HomeView: View {
 
     /// Format date for the button display
     private func formatButtonDate(_ date: Date, isHourly: Bool) -> String {
-        let formatter = DateFormatter()
         if isHourly {
-            formatter.dateFormat = "h:mm a"
+            return date.formatted(.dateTime.hour())
         } else {
-            formatter.dateFormat = "EEEE, MMM d"
+            return date.formatted(.dateTime.weekday(.wide))
         }
-        return formatter.string(from: date)
+    }
+
+    // MARK: Hourly Picker Helpers
+
+    /// Get unique days from hourly forecast
+    private func getUniqueDays(from weather: Weather) -> [Date] {
+        let calendar = Calendar.current
+        var uniqueDays: [Date] = []
+        var seenDays: Set<DateComponents> = []
+
+        for hourWeather in weather.hourlyForecast {
+            let dayComponents = calendar.dateComponents([.year, .month, .day], from: hourWeather.date)
+            if !seenDays.contains(dayComponents) {
+                seenDays.insert(dayComponents)
+                if let dayStart = calendar.date(from: dayComponents) {
+                    uniqueDays.append(dayStart)
+                }
+            }
+        }
+
+        return uniqueDays
+    }
+
+    /// Get hours for a specific day
+    private func getHoursForDay(_ day: Date, from weather: Weather) -> [WeatherKit.HourWeather] {
+        let calendar = Calendar.current
+        let targetDay = calendar.dateComponents([.year, .month, .day], from: day)
+
+        return weather.hourlyForecast.filter { hourWeather in
+            let hourDay = calendar.dateComponents([.year, .month, .day], from: hourWeather.date)
+            return hourDay == targetDay
+        }
+    }
+
+    /// Initialize hourly picker with current hourlyIndex
+    private func initializeHourlyPicker(from weather: Weather) {
+        guard hourlyIndex < weather.hourlyForecast.count else { return }
+
+        let selectedHourWeather = weather.hourlyForecast[hourlyIndex]
+        let calendar = Calendar.current
+
+        // Set selected day to the day of the current hourlyIndex
+        let dayComponents = calendar.dateComponents([.year, .month, .day], from: selectedHourWeather.date)
+        if let dayStart = calendar.date(from: dayComponents) {
+            selectedDay = dayStart
+        }
+
+        // Set selected hour
+        selectedHourOfDay = calendar.component(.hour, from: selectedHourWeather.date)
+    }
+
+    /// Update hourlyIndex based on selected day and hour
+    private func updateHourlyIndex(from weather: Weather) {
+        let calendar = Calendar.current
+
+        for (index, hourWeather) in weather.hourlyForecast.enumerated() {
+            let hourDay = calendar.dateComponents([.year, .month, .day], from: hourWeather.date)
+            let targetDay = calendar.dateComponents([.year, .month, .day], from: selectedDay)
+            let hour = calendar.component(.hour, from: hourWeather.date)
+
+            if hourDay == targetDay && hour == selectedHourOfDay {
+                hourlyIndex = index
+                break
+            }
+        }
     }
 
     /// Fetch weather for a location
@@ -294,15 +389,11 @@ struct HomeView: View {
         case .hourly:
             guard index < weather.hourlyForecast.count else { return "" }
             let hourWeather = weather.hourlyForecast[index]
-            let formatter = DateFormatter()
-            formatter.dateFormat = "E, MMM d 'at' h:mm a"
-            return formatter.string(from: hourWeather.date)
+            return hourWeather.date.formatted(.dateTime.weekday(.wide).hour())
         case .daily:
             guard index < weather.dailyForecast.count else { return "" }
             let dayWeather = weather.dailyForecast[index]
-            let formatter = DateFormatter()
-            formatter.dateFormat = "EEEE, MMM d"
-            return formatter.string(from: dayWeather.date)
+            return dayWeather.date.formatted(.dateTime.weekday(.wide))
         case .current:
             return "Current"
         }
