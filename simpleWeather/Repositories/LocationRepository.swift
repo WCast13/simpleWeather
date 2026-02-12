@@ -60,19 +60,11 @@ final class LocationRepository {
         // 4. Create new location
         let newLocation = WeatherLocation(
             city: result?.addressRepresentations?.cityName,
-            // TODO: Fix Later
-//            state: result?.addressRepresentations?.region?.subRegions.count,
-    
+            state: result?.placemark.administrativeArea,
             zipCode: zipCode,
             latitude: result?.location.coordinate.latitude ?? 0.0,
             longitude: result?.location.coordinate.longitude ?? 0.0,
         )
-        
-        let subRegions = result?.addressRepresentations?.region?.subRegions
-        
-        for place in subRegions ?? [] {
-            print(place.identifier)
-        }
 
         // 5. Save to database
         modelContext.insert(newLocation)
