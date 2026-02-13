@@ -11,15 +11,34 @@ import WeatherKit
 struct WeatherDataItem<T>: View {
     let title: String
     let dataItem: T
-    
+    var icon: String?
+    var accentColor: Color?
+
     var body: some View {
-        
-        VStack {
-            Text(title)
-                .padding(.bottom, 1)
+        VStack(alignment: .leading, spacing: 6) {
+            // Title with optional icon
+            HStack(spacing: 4) {
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.caption2)
+                        .foregroundColor(accentColor ?? .secondary)
+                }
+                Text(title)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+
+            // Value
             Text(verbatim: String(describing: dataItem))
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .foregroundColor(accentColor ?? .primary)
         }
-        .font(.caption)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemGray6))
+        )
     }
 }
 

@@ -69,87 +69,118 @@ struct HomeView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
-                List {
-                    ForEach(locations) { location in
-                        if let weather = weatherViewModel.weather(for: location.id) {
-                            NavigationLink(destination: WeatherDetailView(weather: weather, location: location)) {
-                                WeatherRowContainer(
-                                    location: location,
-                                    weather: weather,
-                                    dataType: selectedDataType,
-                                    hourlyIndex: hourlyIndex,
-                                    dailyIndex: dailyIndex,
-                                    showGrid: showWeatherGrid
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        ForEach(locations) { location in
+                            if let weather = weatherViewModel.weather(for: location.id) {
+                                NavigationLink(destination: WeatherDetailView(weather: weather, location: location)) {
+                                    WeatherRowContainer(
+                                        location: location,
+                                        weather: weather,
+                                        dataType: selectedDataType,
+                                        hourlyIndex: hourlyIndex,
+                                        dailyIndex: dailyIndex,
+                                        showGrid: showWeatherGrid
+                                    )
+                                    .animation(.easeInOut(duration: 0.3), value: showWeatherGrid)
+                                    .animation(.easeInOut(duration: 0.3), value: selectedDataType)
+                                    .animation(.easeInOut(duration: 0.2), value: hourlyIndex)
+                                    .animation(.easeInOut(duration: 0.2), value: dailyIndex)
+                                }
+                                .buttonStyle(.plain)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color(.systemBackground))
+                                        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
                                 )
-                                .animation(.easeInOut(duration: 0.3), value: showWeatherGrid)
-                                .animation(.easeInOut(duration: 0.3), value: selectedDataType)
-                                .animation(.easeInOut(duration: 0.2), value: hourlyIndex)
-                                .animation(.easeInOut(duration: 0.2), value: dailyIndex)
-                            }
-                            .swipeActions(edge: .leading) {
-                                Button {
-                                    toggleFavorite(location)
-                                } label: {
-                                    Label(location.isFavorite ?? false ? "Unfavorite" : "Favorite",
-                                          systemImage: location.isFavorite ?? false ? "star.slash" : "star.fill")
-                                }
-                                .tint(.yellow)
-                            }
-                            .swipeActions(edge: .trailing) {
-                                Button {
-                                    customizingLocation = location
-                                } label: {
-                                    Label("Customize", systemImage: "slider.horizontal.3")
-                                }
-                                .tint(.blue)
-                            }
-                        } else if let errorMessage = weatherViewModel.errorMessage(for: location.id) {
-                            // Show error state with retry button
-                            VStack(spacing: 8) {
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(location.city ?? "Unknown Location")
-                                            .font(.headline)
-                                        Text("Failed to load weather")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    Spacer()
+                                .padding(.horizontal)
+                                .contextMenu {
                                     Button {
-                                        showError(message: errorMessage, for: location.id)
+                                        toggleFavorite(location)
                                     } label: {
-                                        Image(systemName: "exclamationmark.triangle.fill")
-                                            .foregroundColor(.orange)
+                                        Label(location.isFavorite ?? false ? "Unfavorite" : "Favorite",
+                                              systemImage: location.isFavorite ?? false ? "star.slash.fill" : "star.fill")
                                     }
-                                    .buttonStyle(.plain)
 
                                     Button {
-                                        Task {
-                                            await weatherViewModel.fetchWeather(for: location, forceRefresh: true)
-                                            if weatherViewModel.errorMessage(for: location.id) == nil {
-                                                updateLastUpdated(location)
-                                            }
+                                        customizingLocation = location
+                                    } label: {
+                                        Label("Customize", systemImage: "slider.horizontal.3")
+                                    }
+
+                                    Divider()
+
+                                    Button(role: .destructive) {
+                                        if let index = locations.firstIndex(where: { $0.id == location.id }) {
+                                            deleteLocations(at: IndexSet(integer: index))
                                         }
                                     } label: {
-                                        Image(systemName: "arrow.clockwise")
+                                        Label("Delete", systemImage: "trash")
                                     }
-                                    .buttonStyle(.plain)
                                 }
+                            } else if let errorMessage = weatherViewModel.errorMessage(for: location.id) {
+                                // Error card with background
+                                VStack(spacing: 12) {
+                                    HStack {
+                                        VStack(alignment: .leading) {
+                                            Text(location.city ?? "Unknown Location")
+                                                .font(.headline)
+                                            Text("Failed to load weather")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        Spacer()
+                                        Button {
+                                            showError(message: errorMessage, for: location.id)
+                                        } label: {
+                                            Image(systemName: "exclamationmark.triangle.fill")
+                                                .foregroundColor(.orange)
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        Button {
+                                            Task {
+                                                await weatherViewModel.fetchWeather(for: location, forceRefresh: true)
+                                                if weatherViewModel.errorMessage(for: location.id) == nil {
+                                                    updateLastUpdated(location)
+                                                }
+                                            }
+                                        } label: {
+                                            Image(systemName: "arrow.clockwise")
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color(.systemBackground))
+                                        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+                                )
+                                .padding(.horizontal)
+                            } else {
+                                // Loading card with background
+                                ProgressView()
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(Color(.systemBackground))
+                                            .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+                                    )
+                                    .padding(.horizontal)
+                                    .task {
+                                        await weatherViewModel.fetchWeather(for: location)
+                                        if weatherViewModel.errorMessage(for: location.id) == nil {
+                                            updateLastUpdated(location)
+                                        }
+                                    }
                             }
-                            .padding(.vertical, 8)
-                        } else {
-                            ProgressView()
-                                .task {
-                                    await weatherViewModel.fetchWeather(for: location)
-                                    if weatherViewModel.errorMessage(for: location.id) == nil {
-                                        updateLastUpdated(location)
-                                    }
-                                }
                         }
                     }
-                    .onDelete(perform: deleteLocations)
-                    .onMove(perform: moveLocations)
+                    .padding(.vertical)
                 }
+                .background(Color(.systemGroupedBackground))
                 .refreshable {
                     await weatherViewModel.refreshAllWeather(for: locations)
                     for location in locations {
@@ -180,15 +211,13 @@ struct HomeView: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(destination: AddLocationView()) {
-                        Image(systemName: "plus")
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        showingAnalytics = true
+                    } label: {
+                        Image(systemName: "chart.bar.fill")
                     }
-                }
-                ToolbarItem(placement: .topBarLeading) {
-                    EditButton()
-                }
-                ToolbarItem(placement: .topBarTrailing) {
+
                     Button {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showWeatherGrid.toggle()
@@ -197,12 +226,9 @@ struct HomeView: View {
                         Image(systemName: showWeatherGrid ? "square.grid.3x3.fill" : "square.grid.3x3")
                             .contentTransition(.symbolEffect(.replace))
                     }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingAnalytics = true
-                    } label: {
-                        Image(systemName: "chart.bar.fill")
+
+                    NavigationLink(destination: AddLocationView()) {
+                        Image(systemName: "plus")
                     }
                 }
             }

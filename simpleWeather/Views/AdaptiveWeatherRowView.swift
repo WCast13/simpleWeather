@@ -38,16 +38,25 @@ struct AdaptiveWeatherRowView: View {
 
             Spacer()
 
-            VStack(alignment: .center, spacing: 4) {
-                Text(temperature)
-                    .font(.largeTitle)
+            HStack(spacing: 8) {
+                // Weather icon
+                if !symbolName.isEmpty {
+                    Image(systemName: symbolName)
+                        .font(.title)
+                        .symbolRenderingMode(.multicolor)
+                }
 
-                HStack(spacing: 4) {
-                    Text(high)
-                        .font(.caption)
-                    if !low.isEmpty {
-                        Text(low)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(temperature)
+                        .font(.system(size: 44, weight: .light))
+
+                    HStack(spacing: 4) {
+                        Text(high)
                             .font(.caption)
+                        if !low.isEmpty {
+                            Text(low)
+                                .font(.caption)
+                        }
                     }
                 }
             }
