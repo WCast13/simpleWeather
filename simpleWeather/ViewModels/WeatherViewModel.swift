@@ -31,20 +31,32 @@ final class WeatherViewModel {
     var errorMessage: String?
 
     private let weatherManager: WeatherKitManager
+    private let cache: WeatherCache
 
     // MARK: - Initialization
 
-    init(weatherManager: WeatherKitManager = .shared) {
+    init(weatherManager: WeatherKitManager = .shared, cache: WeatherCache = .shared) {
         self.weatherManager = weatherManager
+        self.cache = cache
     }
 
     // MARK: - Public Methods
 
     /// Fetch weather for a specific location
-    func fetchWeather(for location: WeatherLocation) async {
+    /// - Parameters:
+    ///   - location: The weather location to fetch data for
+    ///   - forceRefresh: If true, bypass cache and fetch fresh data
+    func fetchWeather(for location: WeatherLocation, forceRefresh: Bool = false) async {
         guard let latitude = location.latitude,
               let longitude = location.longitude else {
-            errorMessages[location.id] = "Invalid coordinates"
+            errorMessages[location.id] = "Invalid coordinates for \(location.city ?? "unknown location")"
+            return
+        }
+
+        // Check cache first unless force refresh is requested
+        if !forceRefresh, let cachedWeather = cache.get(for: location.id) {
+            weatherData[location.id] = cachedWeather
+            errorMessages[location.id] = nil
             return
         }
 
@@ -57,9 +69,11 @@ final class WeatherViewModel {
                 longitude: longitude
             )
             weatherData[location.id] = weather
+            cache.set(weather, for: location.id)
             loadingStates[location.id] = false
+            errorMessages[location.id] = nil
         } catch {
-            errorMessages[location.id] = "Failed to fetch weather: \(error.localizedDescription)"
+            errorMessages[location.id] = weatherErrorMessage(for: error, location: location)
             loadingStates[location.id] = false
         }
     }
@@ -80,14 +94,25 @@ final class WeatherViewModel {
         isLoading = false
     }
 
-    /// Refresh weather for a specific location
+    /// Refresh weather for a specific location (bypasses cache)
     func refreshWeather(for location: WeatherLocation) async {
-        await fetchWeather(for: location)
+        await fetchWeather(for: location, forceRefresh: true)
     }
 
-    /// Refresh weather for all locations
+    /// Refresh weather for all locations (bypasses cache)
     func refreshAllWeather(for locations: [WeatherLocation]) async {
-        await fetchWeather(for: locations)
+        isLoading = true
+        errorMessage = nil
+
+        await withTaskGroup(of: Void.self) { group in
+            for location in locations {
+                group.addTask {
+                    await self.fetchWeather(for: location, forceRefresh: true)
+                }
+            }
+        }
+
+        isLoading = false
     }
 
     /// Get weather for a specific location
@@ -110,6 +135,7 @@ final class WeatherViewModel {
         weatherData.removeValue(forKey: locationId)
         loadingStates.removeValue(forKey: locationId)
         errorMessages.removeValue(forKey: locationId)
+        cache.clear(for: locationId)
     }
 
     /// Clear all weather data
@@ -117,6 +143,7 @@ final class WeatherViewModel {
         weatherData.removeAll()
         loadingStates.removeAll()
         errorMessages.removeAll()
+        cache.clearAll()
     }
 
     /// Clear error for a specific location
@@ -127,5 +154,40 @@ final class WeatherViewModel {
     /// Clear general error
     func clearError() {
         errorMessage = nil
+    }
+
+    /// Check if cached data is available for a location
+    func isCached(for locationId: UUID) -> Bool {
+        return cache.isValid(for: locationId)
+    }
+
+    /// Get cache timestamp for a location
+    func cacheTimestamp(for locationId: UUID) -> Date? {
+        return cache.getCacheTimestamp(for: locationId)
+    }
+
+    // MARK: - Private Methods
+
+    /// Create a user-friendly error message
+    private func weatherErrorMessage(for error: Error, location: WeatherLocation) -> String {
+        let cityName = location.city ?? "this location"
+
+        // Check for common error types
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet:
+                return "No internet connection. Please check your network and try again."
+            case .timedOut:
+                return "Request timed out. Please try again."
+            case .cannotFindHost, .cannotConnectToHost:
+                return "Cannot connect to weather service. Please try again later."
+            default:
+                return "Network error for \(cityName). Please check your connection."
+            }
+        }
+
+        // Generic error message
+        let errorDescription = (error as NSError).localizedDescription
+        return "Unable to fetch weather for \(cityName): \(errorDescription)"
     }
 }

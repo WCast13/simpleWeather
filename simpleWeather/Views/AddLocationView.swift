@@ -117,7 +117,11 @@ struct AddLocationView: View {
 
         if success {
             // Small delay for better UX feedback
-            try? await Task.sleep(for: .milliseconds(200))
+            do {
+                try await Task.sleep(for: .milliseconds(200))
+            } catch {
+                // Sleep interrupted, just continue
+            }
             dismiss()
         }
     }

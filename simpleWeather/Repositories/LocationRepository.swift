@@ -80,23 +80,35 @@ final class LocationRepository {
     // MARK: - Update Operations
 
     /// Update location metadata (last updated time)
-    func updateLastUpdated(_ location: WeatherLocation) {
+    func updateLastUpdated(_ location: WeatherLocation) throws {
         location.lastUpdated = Date()
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            throw LocationError.saveFailed
+        }
     }
 
     /// Toggle favorite status
-    func toggleFavorite(_ location: WeatherLocation) {
+    func toggleFavorite(_ location: WeatherLocation) throws {
         location.isFavorite?.toggle()
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            throw LocationError.saveFailed
+        }
     }
 
     /// Reorder locations
-    func reorder(locations: [WeatherLocation]) {
+    func reorder(locations: [WeatherLocation]) throws {
         for (index, location) in locations.enumerated() {
             location.displayOrder = index
         }
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            throw LocationError.saveFailed
+        }
     }
 
     // MARK: - Delete Operations

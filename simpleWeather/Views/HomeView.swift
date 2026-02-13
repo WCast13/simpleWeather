@@ -24,6 +24,9 @@ struct HomeView: View {
     @State private var showingTimePicker: Bool = false
     @State private var selectedDay: Date = Date()
     @State private var selectedHourOfDay: Int = 0
+    @State private var showingErrorAlert: Bool = false
+    @State private var activeErrorMessage: String = ""
+    @State private var activeErrorLocationId: UUID?
 
     var body: some View {
         NavigationStack {
@@ -77,17 +80,60 @@ struct HomeView: View {
                                 }
                                 .tint(.yellow)
                             }
-                        }
-                        else {
+                        } else if let errorMessage = weatherViewModel.errorMessage(for: location.id) {
+                            // Show error state with retry button
+                            VStack(spacing: 8) {
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(location.city ?? "Unknown Location")
+                                            .font(.headline)
+                                        Text("Failed to load weather")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                    Button {
+                                        showError(message: errorMessage, for: location.id)
+                                    } label: {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .foregroundColor(.orange)
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Button {
+                                        Task {
+                                            await weatherViewModel.fetchWeather(for: location, forceRefresh: true)
+                                            if weatherViewModel.errorMessage(for: location.id) == nil {
+                                                updateLastUpdated(location)
+                                            }
+                                        }
+                                    } label: {
+                                        Image(systemName: "arrow.clockwise")
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.vertical, 8)
+                        } else {
                             ProgressView()
                                 .task {
                                     await weatherViewModel.fetchWeather(for: location)
-                                    updateLastUpdated(location)
+                                    if weatherViewModel.errorMessage(for: location.id) == nil {
+                                        updateLastUpdated(location)
+                                    }
                                 }
                         }
                     }
                     .onDelete(perform: deleteLocations)
                     .onMove(perform: moveLocations)
+                }
+                .refreshable {
+                    await weatherViewModel.refreshAllWeather(for: locations)
+                    for location in locations {
+                        if weatherViewModel.weather(for: location.id) != nil {
+                            updateLastUpdated(location)
+                        }
+                    }
                 }
                 .onAppear {
                     Task {
@@ -130,6 +176,26 @@ struct HomeView: View {
                     }
                 }
             }
+            .alert("Weather Error", isPresented: $showingErrorAlert) {
+                Button("OK") {
+                    showingErrorAlert = false
+                    if let locationId = activeErrorLocationId {
+                        weatherViewModel.clearError(for: locationId)
+                    }
+                }
+                if let locationId = activeErrorLocationId {
+                    Button("Retry") {
+                        Task {
+                            if let location = locations.first(where: { $0.id == locationId }) {
+                                await weatherViewModel.fetchWeather(for: location, forceRefresh: true)
+                            }
+                        }
+                        showingErrorAlert = false
+                    }
+                }
+            } message: {
+                Text(activeErrorMessage)
+            }
         }
     }
 
@@ -164,7 +230,11 @@ struct HomeView: View {
             weatherViewModel.clearWeather(for: location.id)
             modelContext.delete(location)
         }
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            showError(message: "Failed to delete location: \(error.localizedDescription)", for: UUID())
+        }
     }
 
     /// Move/reorder locations
@@ -176,19 +246,38 @@ struct HomeView: View {
         for (index, location) in updatedLocations.enumerated() {
             location.displayOrder = index
         }
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            showError(message: "Failed to reorder locations: \(error.localizedDescription)", for: UUID())
+        }
     }
 
     /// Toggle favorite status
     private func toggleFavorite(_ location: WeatherLocation) {
         location.isFavorite = !(location.isFavorite ?? false)
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            showError(message: "Failed to update favorite status: \(error.localizedDescription)", for: location.id)
+        }
     }
 
     /// Update last updated timestamp
     private func updateLastUpdated(_ location: WeatherLocation) {
         location.lastUpdated = Date()
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            print("Failed to save last updated timestamp: \(error.localizedDescription)")
+        }
+    }
+
+    /// Show error alert with message
+    private func showError(message: String, for locationId: UUID) {
+        activeErrorMessage = message
+        activeErrorLocationId = locationId
+        showingErrorAlert = true
     }
 }
 

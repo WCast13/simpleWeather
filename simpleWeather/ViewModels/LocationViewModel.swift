@@ -84,19 +84,31 @@ final class LocationViewModel {
 
     /// Toggle favorite status
     func toggleFavorite(_ location: WeatherLocation) {
-        repository.toggleFavorite(location)
-        loadLocations()
+        do {
+            try repository.toggleFavorite(location)
+            loadLocations()
+        } catch {
+            errorMessage = "Failed to update favorite status"
+        }
     }
 
     /// Reorder locations
     func moveLocations(from source: IndexSet, to destination: Int) {
         locations.move(fromOffsets: source, toOffset: destination)
-        repository.reorder(locations: locations)
+        do {
+            try repository.reorder(locations: locations)
+        } catch {
+            errorMessage = "Failed to reorder locations"
+        }
     }
 
     /// Update last updated timestamp
     func updateLastUpdated(_ location: WeatherLocation) {
-        repository.updateLastUpdated(location)
+        do {
+            try repository.updateLastUpdated(location)
+        } catch {
+            errorMessage = "Failed to update timestamp"
+        }
     }
 
     /// Clear error message
