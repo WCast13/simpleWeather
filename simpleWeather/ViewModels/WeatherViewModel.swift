@@ -30,14 +30,20 @@ final class WeatherViewModel {
     /// General error message
     var errorMessage: String?
 
+    /// Offline mode indicator
+    private(set) var isOffline: Bool = false
+
     private let weatherManager: WeatherKitManager
     private let cache: WeatherCache
+    private let networkMonitor: NetworkMonitor
 
     // MARK: - Initialization
 
-    init(weatherManager: WeatherKitManager = .shared, cache: WeatherCache = .shared) {
+    init(weatherManager: WeatherKitManager = .shared, cache: WeatherCache = .shared, networkMonitor: NetworkMonitor = .shared) {
         self.weatherManager = weatherManager
         self.cache = cache
+        self.networkMonitor = networkMonitor
+        self.isOffline = networkMonitor.isOffline
     }
 
     // MARK: - Public Methods
@@ -53,10 +59,25 @@ final class WeatherViewModel {
             return
         }
 
+        // Update offline status
+        isOffline = networkMonitor.isOffline
+
         // Check cache first unless force refresh is requested
         if !forceRefresh, let cachedWeather = cache.get(for: location.id) {
             weatherData[location.id] = cachedWeather
             errorMessages[location.id] = nil
+            return
+        }
+
+        // If offline and no valid cache, show offline message
+        if networkMonitor.isOffline {
+            // Check if we have expired cache we can show
+            if let cachedWeather = cache.get(for: location.id) {
+                weatherData[location.id] = cachedWeather
+                errorMessages[location.id] = "Showing cached data (offline mode)"
+            } else {
+                errorMessages[location.id] = "No internet connection. Weather data not available."
+            }
             return
         }
 
@@ -73,7 +94,13 @@ final class WeatherViewModel {
             loadingStates[location.id] = false
             errorMessages[location.id] = nil
         } catch {
-            errorMessages[location.id] = weatherErrorMessage(for: error, location: location)
+            // On error, try to show cached data as fallback
+            if let cachedWeather = cache.get(for: location.id) {
+                weatherData[location.id] = cachedWeather
+                errorMessages[location.id] = "Using cached data (\(weatherErrorMessage(for: error, location: location)))"
+            } else {
+                errorMessages[location.id] = weatherErrorMessage(for: error, location: location)
+            }
             loadingStates[location.id] = false
         }
     }
@@ -164,6 +191,48 @@ final class WeatherViewModel {
     /// Get cache timestamp for a location
     func cacheTimestamp(for locationId: UUID) -> Date? {
         return cache.getCacheTimestamp(for: locationId)
+    }
+
+    /// Background refresh for all locations (non-blocking)
+    func backgroundRefreshAll(for locations: [WeatherLocation]) {
+        Task(priority: .background) {
+            await withTaskGroup(of: Void.self) { group in
+                for location in locations {
+                    group.addTask {
+                        await self.fetchWeather(for: location, forceRefresh: true)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Background refresh for locations with expired cache
+    func backgroundRefreshExpired(for locations: [WeatherLocation]) {
+        Task(priority: .background) {
+            let expiredLocations = locations.filter { !cache.isValid(for: $0.id) }
+
+            await withTaskGroup(of: Void.self) { group in
+                for location in expiredLocations {
+                    group.addTask {
+                        await self.fetchWeather(for: location)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Schedule periodic background refresh (call from app delegate or scene)
+    func schedulePeriodicRefresh(for locations: [WeatherLocation], intervalMinutes: Int = 15) {
+        Task {
+            while true {
+                try? await Task.sleep(for: .seconds(intervalMinutes * 60))
+
+                // Only refresh if online
+                guard !networkMonitor.isOffline else { continue }
+
+                await backgroundRefreshExpired(for: locations)
+            }
+        }
     }
 
     // MARK: - Private Methods

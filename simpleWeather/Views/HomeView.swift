@@ -27,10 +27,24 @@ struct HomeView: View {
     @State private var showingErrorAlert: Bool = false
     @State private var activeErrorMessage: String = ""
     @State private var activeErrorLocationId: UUID?
+    @State private var showingAnalytics: Bool = false
+    @State private var networkMonitor = NetworkMonitor.shared
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                // Offline Indicator
+                if networkMonitor.isOffline {
+                    HStack {
+                        Image(systemName: "wifi.slash")
+                        Text("Offline Mode - Showing Cached Data")
+                            .font(.caption)
+                    }
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.orange.opacity(0.2))
+                }
+
                 // Segmented Control
                 Picker("Weather Data Type", selection: $selectedDataType) {
                     ForEach(WeatherDataType.allCases, id: \.self) { type in
@@ -175,6 +189,16 @@ struct HomeView: View {
                             .contentTransition(.symbolEffect(.replace))
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingAnalytics = true
+                    } label: {
+                        Image(systemName: "chart.bar.fill")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingAnalytics) {
+                CacheAnalyticsView(cache: .shared, networkMonitor: networkMonitor)
             }
             .alert("Weather Error", isPresented: $showingErrorAlert) {
                 Button("OK") {
