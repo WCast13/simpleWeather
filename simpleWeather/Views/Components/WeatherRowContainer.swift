@@ -110,70 +110,52 @@ struct CustomizableWeatherGridView: View {
             WeatherDataItem(
                 title: "Feels Like",
                 dataItem: "\(Int(gridData.currentWeather.apparentTemperature.converted(to: .fahrenheit).value))°",
-                icon: "thermometer.medium",
-                accentColor: .orange
+                icon: "thermometer.medium"
             )
         case .humidity:
             WeatherDataItem(
                 title: "Humidity",
                 dataItem: "\(Int(gridData.humidity * 100))%",
-                icon: "humidity.fill",
-                accentColor: .blue
+                icon: "humidity.fill"
             )
         case .wind:
             WeatherDataItem(
                 title: "Wind",
                 dataItem: "\(Int(gridData.wind.speed.converted(to: .milesPerHour).value)) mph",
-                icon: "wind",
-                accentColor: .cyan
+                icon: "wind"
             )
         case .cloudCover:
             WeatherDataItem(
                 title: "Cloud Cover",
                 dataItem: "\(Int(gridData.cloudCover * 100))%",
-                icon: "cloud.fill",
-                accentColor: .gray
+                icon: "cloud.fill"
             )
         case .uvIndex:
             WeatherDataItem(
                 title: "UV Index",
                 dataItem: "\(gridData.uvIndex.value)",
-                icon: "sun.max.fill",
-                accentColor: uvIndexColor(gridData.uvIndex.value)
+                icon: "sun.max.fill"
             )
         case .visibility:
             WeatherDataItem(
                 title: "Visibility",
                 dataItem: String(format: "%.1f mi", gridData.visibility.converted(to: .miles).value),
-                icon: "eye.fill",
-                accentColor: .teal
+                icon: "eye.fill"
             )
         case .pressure:
             WeatherDataItem(
                 title: "Pressure",
                 dataItem: String(format: "%.2f inHg", gridData.pressure.converted(to: .inchesOfMercury).value),
-                icon: "gauge.with.dots.needle.bottom.50percent",
-                accentColor: .purple
+                icon: "gauge.with.dots.needle.bottom.50percent"
             )
         case .windGust:
             if let gust = gridData.wind.gust {
                 WeatherDataItem(
                     title: "Wind Gust",
                     dataItem: "\(Int(gust.converted(to: .milesPerHour).value)) mph",
-                    icon: "wind.snow",
-                    accentColor: .indigo
+                    icon: "wind.snow"
                 )
             }
-        }
-    }
-
-    private func uvIndexColor(_ value: Int) -> Color {
-        switch value {
-        case 0...2: return .green
-        case 3...5: return .yellow
-        case 6...7: return .orange
-        case 8...10: return .red
-        default: return .purple
         }
     }
 }
