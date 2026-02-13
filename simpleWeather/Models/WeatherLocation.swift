@@ -24,6 +24,10 @@ class WeatherLocation: Identifiable {
     var displayOrder: Int?
     var isFavorite: Bool?
 
+    // Display preferences (stored as encoded Data)
+    @Attribute(.externalStorage)
+    var displayPreferencesData: Data?
+
     init(date: Date? = Date(),
         city: String? = nil,
          state: String? = nil,
@@ -41,6 +45,22 @@ class WeatherLocation: Identifiable {
         self.dateAdded = Date()
         self.displayOrder = displayOrder
         self.isFavorite = isFavorite
+        self.displayPreferencesData = nil
+    }
+
+    // MARK: - Display Preferences
+
+    /// Get display preferences for this location
+    var displayPreferences: WeatherDisplayPreferences {
+        get {
+            guard let data = displayPreferencesData else {
+                return .default
+            }
+            return (try? JSONDecoder().decode(WeatherDisplayPreferences.self, from: data)) ?? .default
+        }
+        set {
+            displayPreferencesData = try? JSONEncoder().encode(newValue)
+        }
     }
 
     /// Computed property for display name

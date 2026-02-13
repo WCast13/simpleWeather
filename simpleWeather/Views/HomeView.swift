@@ -29,6 +29,7 @@ struct HomeView: View {
     @State private var activeErrorLocationId: UUID?
     @State private var showingAnalytics: Bool = false
     @State private var networkMonitor = NetworkMonitor.shared
+    @State private var customizingLocation: WeatherLocation?
 
     var body: some View {
         NavigationStack {
@@ -93,6 +94,14 @@ struct HomeView: View {
                                           systemImage: location.isFavorite ?? false ? "star.slash" : "star.fill")
                                 }
                                 .tint(.yellow)
+                            }
+                            .swipeActions(edge: .trailing) {
+                                Button {
+                                    customizingLocation = location
+                                } label: {
+                                    Label("Customize", systemImage: "slider.horizontal.3")
+                                }
+                                .tint(.blue)
                             }
                         } else if let errorMessage = weatherViewModel.errorMessage(for: location.id) {
                             // Show error state with retry button
@@ -199,6 +208,9 @@ struct HomeView: View {
             }
             .sheet(isPresented: $showingAnalytics) {
                 CacheAnalyticsView(cache: .shared, networkMonitor: networkMonitor)
+            }
+            .sheet(item: $customizingLocation) { location in
+                WeatherDisplayCustomizationView(location: location)
             }
             .alert("Weather Error", isPresented: $showingErrorAlert) {
                 Button("OK") {
