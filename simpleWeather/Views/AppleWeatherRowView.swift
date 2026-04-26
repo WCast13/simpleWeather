@@ -20,7 +20,7 @@ struct AppleWeatherRowView: View {
         
         HStack {
             VStack(alignment: .leading) {
-                Text("\(location.city ?? "")")
+                Text(location.city)
                     .font(.headline)
                 Text("\(weather.currentWeather.date.formatted(date: .omitted, time: .shortened))")
                     .font(.caption)

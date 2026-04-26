@@ -17,7 +17,7 @@ struct WeatherDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
                 // Current Weather Section
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(location.city ?? "Unknown Location")
+                    Text(location.displayName)
                         .font(.title)
                         .bold()
 
@@ -284,8 +284,8 @@ struct WeatherPreviewWrapper: View {
     private func loadWeather() async {
         do {
             weather = try await WeatherKitManager.shared.fetchWeather(
-                latitude: location.latitude ?? 0.0,
-                longitude: location.longitude ?? 0.0
+                latitude: location.latitude,
+                longitude: location.longitude
             )
             isLoading = false
         } catch {

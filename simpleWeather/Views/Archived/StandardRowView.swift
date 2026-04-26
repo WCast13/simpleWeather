@@ -17,7 +17,7 @@ struct StandardRowView: View {
         HStack {
             VStack(alignment: .leading) {
                 
-                Text(location.city ?? "Unknown Location")
+                Text(location.displayName)
                     .font(.headline)
                 
                 HStack {

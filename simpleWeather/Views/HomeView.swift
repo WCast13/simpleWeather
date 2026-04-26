@@ -98,8 +98,8 @@ struct HomeView: View {
                                     Button {
                                         toggleFavorite(location)
                                     } label: {
-                                        Label(location.isFavorite ?? false ? "Unfavorite" : "Favorite",
-                                              systemImage: location.isFavorite ?? false ? "star.slash.fill" : "star.fill")
+                                        Label(location.isFavorite ? "Unfavorite" : "Favorite",
+                                              systemImage: location.isFavorite ? "star.slash.fill" : "star.fill")
                                     }
 
                                     Button {
@@ -123,7 +123,7 @@ struct HomeView: View {
                                 VStack(spacing: 12) {
                                     HStack {
                                         VStack(alignment: .leading) {
-                                            Text(location.city ?? "Unknown Location")
+                                            Text(location.displayName)
                                                 .font(.headline)
                                             Text("Failed to load weather")
                                                 .font(.subheadline)
@@ -317,7 +317,7 @@ struct HomeView: View {
 
     /// Toggle favorite status
     private func toggleFavorite(_ location: WeatherLocation) {
-        location.isFavorite = !(location.isFavorite ?? false)
+        location.isFavorite.toggle()
         do {
             try modelContext.save()
         } catch {

@@ -53,11 +53,15 @@ final class WeatherViewModel {
     ///   - location: The weather location to fetch data for
     ///   - forceRefresh: If true, bypass cache and fetch fresh data
     func fetchWeather(for location: WeatherLocation, forceRefresh: Bool = false) async {
-        guard let latitude = location.latitude,
-              let longitude = location.longitude else {
-            errorMessages[location.id] = "Invalid coordinates for \(location.city ?? "unknown location")"
+        // v2 collapsed lat/lon to non-optional Double. (0,0) is "Null Island"
+        // in the Atlantic — used here as a sentinel for "geocode failed".
+        guard !(location.latitude == 0 && location.longitude == 0) else {
+            let cityLabel = location.city.isEmpty ? "unknown location" : location.city
+            errorMessages[location.id] = "Invalid coordinates for \(cityLabel)"
             return
         }
+        let latitude = location.latitude
+        let longitude = location.longitude
 
         // Update offline status
         isOffline = networkMonitor.isOffline
@@ -239,7 +243,7 @@ final class WeatherViewModel {
 
     /// Create a user-friendly error message
     private func weatherErrorMessage(for error: Error, location: WeatherLocation) -> String {
-        let cityName = location.city ?? "this location"
+        let cityName = location.city.isEmpty ? "this location" : location.city
 
         // Check for common error types
         if let urlError = error as? URLError {

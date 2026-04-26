@@ -20,7 +20,7 @@ struct AdaptiveWeatherRowView: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(location.city ?? "")
+                Text(location.city)
                     .font(.headline)
 
                 if let date = date {

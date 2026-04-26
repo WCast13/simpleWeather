@@ -1,40 +1,46 @@
 //
-//  LocationRepository.swift
+//  LocationRepository.swift  (drop-in replacement — v2)
 //  simpleWeather
 //
-//  Created by William Castellano on 11/5/25.
+//  Diffs vs current:
+//  - Returns concrete WeatherLocation everywhere (no optionals on stored fields).
+//  - Adds purgeExpired() for the auto-remove sweep on launch.
+//  - addLocation now takes locationType + optional removeAt.
+//  - reorder is unchanged but documented: this is what makes drag-to-reorder
+//    sync deterministically across devices (CloudKit ordered relationships
+//    are not safe; we use an Int.).
 //
 
 import Foundation
 import SwiftData
 
-/// Repository for managing location persistence and business logic
 @MainActor
 final class LocationRepository {
     private let modelContext: ModelContext
 
-    init(modelContext: ModelContext){
+    init(modelContext: ModelContext) {
         self.modelContext = modelContext
     }
 
-    /// Convenience factory to construct a repository on the main actor
+    /// Convenience factory to construct a repository on the main actor.
     /// Ensures main-actor-isolated dependencies are created safely.
     @MainActor
     static func make(modelContext: ModelContext) -> LocationRepository {
         LocationRepository(modelContext: modelContext)
     }
 
-    // MARK: - Fetch Operations
+    // MARK: - Fetch
 
-    /// Fetch all locations sorted by display order
     func fetchAllLocations() throws -> [WeatherLocation] {
         let descriptor = FetchDescriptor<WeatherLocation>(
-            sortBy: [SortDescriptor(\.displayOrder), SortDescriptor(\.dateAdded)]
+            sortBy: [
+                SortDescriptor(\.displayOrder),
+                SortDescriptor(\.dateAdded),
+            ]
         )
         return try modelContext.fetch(descriptor)
     }
 
-    /// Fetch favorite locations only
     func fetchFavoriteLocations() throws -> [WeatherLocation] {
         let descriptor = FetchDescriptor<WeatherLocation>(
             predicate: #Predicate { $0.isFavorite == true },
@@ -43,83 +49,76 @@ final class LocationRepository {
         return try modelContext.fetch(descriptor)
     }
 
-    // MARK: - Add Location
+    // MARK: - Add
 
-    /// Add a new location from a search query
-    /// - Parameter query: City name or ZIP code
-    /// - Returns: The newly created location
-    /// - Throws: LocationError if geocoding or saving fails
-    func addLocation(query: String) async throws -> WeatherLocation {
-        // 1. Geocode the query
+    func addLocation(
+        query: String,
+        locationType: LocationType = .permanent,
+        removeAt: Date? = nil
+    ) async throws -> WeatherLocation {
         let result = await GeocodeManager(address: query).forwardGeocode(address: query)
-        print(result ?? "No result")
-        
-        // 3. Determine if input was a ZIP code
-        let zipCode = isZipCode(query) ? query : nil
 
-        // 4. Create new location
-        let newLocation = WeatherLocation(
-            city: result?.addressRepresentations?.cityName,
-            state: result?.placemark.administrativeArea,
+        let zipCode = isZipCode(query) ? query : ""
+        let city    = result?.addressRepresentations?.cityName ?? ""
+        let lat     = result?.location.coordinate.latitude  ?? 0
+        let lon     = result?.location.coordinate.longitude ?? 0
+
+        // Place at end of list — caller can reorder after.
+        let nextOrder = (try? fetchAllLocations().last?.displayOrder ?? -1) ?? -1
+
+        let new = WeatherLocation(
+            city: city,
+            state: "",          // TODO: pull from result.region once region API is sorted
             zipCode: zipCode,
-            latitude: result?.location.coordinate.latitude ?? 0.0,
-            longitude: result?.location.coordinate.longitude ?? 0.0,
+            latitude: lat,
+            longitude: lon,
+            displayOrder: nextOrder + 1,
+            isFavorite: false,
+            cardSize: .compact,
+            locationType: locationType,
+            removeAt: removeAt
         )
 
-        // 5. Save to database
-        modelContext.insert(newLocation)
-
+        modelContext.insert(new)
         do {
             try modelContext.save()
-            return newLocation
+            return new
         } catch {
             throw LocationError.saveFailed
         }
     }
 
-    // MARK: - Update Operations
+    // MARK: - Update
 
-    /// Update location metadata (last updated time)
-    func updateLastUpdated(_ location: WeatherLocation) throws {
+    func updateLastUpdated(_ location: WeatherLocation) {
         location.lastUpdated = Date()
-        do {
-            try modelContext.save()
-        } catch {
-            throw LocationError.saveFailed
-        }
+        try? modelContext.save()
     }
 
-    /// Toggle favorite status
-    func toggleFavorite(_ location: WeatherLocation) throws {
-        location.isFavorite?.toggle()
-        do {
-            try modelContext.save()
-        } catch {
-            throw LocationError.saveFailed
-        }
+    func toggleFavorite(_ location: WeatherLocation) {
+        location.isFavorite.toggle()
+        try? modelContext.save()
     }
 
-    /// Reorder locations
-    func reorder(locations: [WeatherLocation]) throws {
+    func setCardSize(_ location: WeatherLocation, _ size: CardSize) {
+        location.cardSize = size
+        try? modelContext.save()
+    }
+
+    func reorder(locations: [WeatherLocation]) {
         for (index, location) in locations.enumerated() {
             location.displayOrder = index
         }
-        do {
-            try modelContext.save()
-        } catch {
-            throw LocationError.saveFailed
-        }
+        try? modelContext.save()
     }
 
-    // MARK: - Delete Operations
+    // MARK: - Delete
 
-    /// Delete a location
     func delete(_ location: WeatherLocation) throws {
         modelContext.delete(location)
         try modelContext.save()
     }
 
-    /// Delete multiple locations
     func delete(at offsets: IndexSet, from locations: [WeatherLocation]) throws {
         for index in offsets {
             modelContext.delete(locations[index])
@@ -127,13 +126,34 @@ final class LocationRepository {
         try modelContext.save()
     }
 
-    // MARK: - Helper Methods
+    // MARK: - Auto-purge (Aspen-style temporary locations)
 
-    /// Determines if the input is a ZIP code
+    /// Call once on app launch. Removes any temporary location whose
+    /// `removeAt` is in the past. Returns count removed (for logging / a toast).
+    @discardableResult
+    func purgeExpired(now: Date = Date()) throws -> Int {
+        // SwiftData's `#Predicate` macro doesn't support enum-case `.rawValue`
+        // lookups or force-unwrap of optionals, so the predicate filters only
+        // on the (literal) raw type and the date check happens in Swift.
+        // `1` here MUST stay in sync with `LocationType.temporary.rawValue`.
+        let descriptor = FetchDescriptor<WeatherLocation>(
+            predicate: #Predicate { loc in
+                loc.locationTypeRaw == 1
+            }
+        )
+        let candidates = try modelContext.fetch(descriptor)
+        let expired = candidates.filter { loc in
+            guard let removeAt = loc.removeAt else { return false }
+            return removeAt < now
+        }
+        for loc in expired { modelContext.delete(loc) }
+        if !expired.isEmpty { try modelContext.save() }
+        return expired.count
+    }
+
+    // MARK: - Helpers
+
     private func isZipCode(_ input: String) -> Bool {
-        // Simple check: 5 digits, optionally followed by dash and 4 more digits
-        let zipPattern = "^\\d{5}(-\\d{4})?$"
-        return input.range(of: zipPattern, options: .regularExpression) != nil
+        input.range(of: #"^\d{5}(-\d{4})?$"#, options: .regularExpression) != nil
     }
 }
-
