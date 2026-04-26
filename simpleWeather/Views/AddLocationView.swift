@@ -14,6 +14,10 @@ struct AddLocationView: View {
 
     @State private var viewModel: LocationViewModel?
     @State private var locationInput = ""
+    @State private var locationType: LocationType = .permanent
+    /// Default removal date for a Temporary location: one week out.
+    @State private var removeAt: Date =
+        Calendar.current.date(byAdding: .day, value: 7, to: .now) ?? .now
     @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
@@ -43,6 +47,35 @@ struct AddLocationView: View {
                 }
                 .padding(.horizontal)
                 .padding(.top)
+
+                // Location Type Section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Location Type")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+
+                    Picker("Type", selection: $locationType) {
+                        Text("Permanent").tag(LocationType.permanent)
+                        Text("Temporary").tag(LocationType.temporary)
+                    }
+                    .pickerStyle(.segmented)
+
+                    if locationType == .temporary {
+                        DatePicker(
+                            "Auto-remove on",
+                            selection: $removeAt,
+                            in: Date()...,
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.compact)
+
+                        Text("This location will be removed automatically on the selected date.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal)
+                .animation(.snappy, value: locationType)
 
                 // Status Section
                 if let viewModel = viewModel, viewModel.isLoading {
@@ -113,7 +146,11 @@ struct AddLocationView: View {
             return
         }
 
-        let success = await viewModel.addLocation(query: trimmedInput)
+        let success = await viewModel.addLocation(
+            query: trimmedInput,
+            locationType: locationType,
+            removeAt: locationType == .temporary ? removeAt : nil
+        )
 
         if success {
             // Small delay for better UX feedback

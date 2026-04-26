@@ -41,13 +41,26 @@ final class LocationViewModel {
         }
     }
 
-    /// Add a new location
-    func addLocation(query: String) async -> Bool {
+    /// Add a new location.
+    /// - Parameters:
+    ///   - query: City name or ZIP code.
+    ///   - locationType: Permanent (default) or temporary trip / event.
+    ///   - removeAt: Auto-removal date for temporary locations; ignored
+    ///     unless `locationType == .temporary`.
+    func addLocation(
+        query: String,
+        locationType: LocationType = .permanent,
+        removeAt: Date? = nil
+    ) async -> Bool {
         isLoading = true
         errorMessage = nil
 
         do {
-            let newLocation = try await repository.addLocation(query: query)
+            let newLocation = try await repository.addLocation(
+                query: query,
+                locationType: locationType,
+                removeAt: removeAt
+            )
             locations.append(newLocation)
             isLoading = false
             return true
