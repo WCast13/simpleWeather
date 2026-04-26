@@ -6,13 +6,8 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		E1D348D12D5176BF0030E1DF /* AuthKey_FLBJ6PK27Z.p8 in Resources */ = {isa = PBXBuildFile; fileRef = E1D348D02D5176BF0030E1DF /* AuthKey_FLBJ6PK27Z.p8 */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXFileReference section */
 		E1CD81772D516AE600FEFCD9 /* simpleWeather.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = simpleWeather.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E1D348D02D5176BF0030E1DF /* AuthKey_FLBJ6PK27Z.p8 */ = {isa = PBXFileReference; lastKnownFileType = text; path = AuthKey_FLBJ6PK27Z.p8; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -52,7 +47,6 @@
 			children = (
 				E1CD81792D516AE600FEFCD9 /* simpleWeather */,
 				E1CD81782D516AE600FEFCD9 /* Products */,
-				E1D348D02D5176BF0030E1DF /* AuthKey_FLBJ6PK27Z.p8 */,
 			);
 			sourceTree = "<group>";
 		};
@@ -128,7 +122,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E1D348D12D5176BF0030E1DF /* AuthKey_FLBJ6PK27Z.p8 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

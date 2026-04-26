@@ -60,3 +60,14 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# Secrets — never commit signing keys or auth material
+*.p8
+AuthKey_*
+*.pem
+*.key
+*.cer
+*.p12
+.env
+.env.*
+
