@@ -151,6 +151,14 @@ final class WeatherViewModel {
         return weatherData[locationId]
     }
 
+    /// Adapt the cached `Weather` for a location into the `WeatherSnapshot`
+    /// value type that `LocationCardView` consumes. Returns `nil` while
+    /// loading or if the fetch failed.
+    func snapshot(for locationId: UUID) -> WeatherSnapshot? {
+        guard let weather = weatherData[locationId] else { return nil }
+        return WeatherSnapshot(from: weather)
+    }
+
     /// Check if weather is loading for a location
     func isLoading(for locationId: UUID) -> Bool {
         return loadingStates[locationId] ?? false
@@ -262,5 +270,39 @@ final class WeatherViewModel {
         // Generic error message
         let errorDescription = (error as NSError).localizedDescription
         return "Unable to fetch weather for \(cityName): \(errorDescription)"
+    }
+}
+
+// MARK: - WeatherSnapshot adapter ---------------------------------------------
+
+extension WeatherSnapshot {
+    /// Build a snapshot from a WeatherKit `Weather`. This is the single
+    /// place the WeatherKit field shapes are translated for the hybrid
+    /// Home card; if WeatherKit renames a field, this is what breaks.
+    init(from weather: Weather) {
+        let cw = weather.currentWeather
+        let sunset = weather.dailyForecast.first?.sun.sunset ?? Date()
+        self.init(
+            tempF: cw.temperature.converted(to: .fahrenheit).value,
+            feelsLikeF: cw.apparentTemperature.converted(to: .fahrenheit).value,
+            condition: cw.condition.description,
+            symbolName: cw.symbolName,
+            windMph: cw.wind.speed.converted(to: .milesPerHour).value,
+            windDirAbbr: cw.wind.compassDirection.abbreviation,
+            uvIndex: cw.uvIndex.value,
+            uvCategory: Self.uvCategoryLabel(cw.uvIndex.category),
+            sunsetDate: sunset
+        )
+    }
+
+    private static func uvCategoryLabel(_ category: UVIndex.ExposureCategory) -> String {
+        switch category {
+        case .low:       return "Low"
+        case .moderate:  return "Moderate"
+        case .high:      return "High"
+        case .veryHigh:  return "Very High"
+        case .extreme:   return "Extreme"
+        @unknown default: return ""
+        }
     }
 }

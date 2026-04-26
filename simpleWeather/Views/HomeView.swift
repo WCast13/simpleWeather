@@ -12,29 +12,29 @@ import CoreLocation
 
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
+    // Dual sort: post-v1-migration rows all share displayOrder = 0 because the
+    // migration plan doesn't backfill it; dateAdded breaks ties deterministically.
     @Query(sort: [
+        SortDescriptor(\WeatherLocation.displayOrder),
         SortDescriptor(\WeatherLocation.dateAdded)
-    ])  var locations: [WeatherLocation]
+    ]) var locations: [WeatherLocation]
 
     @State private var weatherViewModel = WeatherViewModel()
-    @AppStorage("showWeatherGrid") private var showWeatherGrid: Bool = true
-    @State private var selectedDataType: WeatherDataType = .current
-    @State private var hourlyIndex: Int = 0
-    @State private var dailyIndex: Int = 0
-    @State private var showingTimePicker: Bool = false
-    @State private var selectedDay: Date = Date()
-    @State private var selectedHourOfDay: Int = 0
     @State private var showingErrorAlert: Bool = false
     @State private var activeErrorMessage: String = ""
     @State private var activeErrorLocationId: UUID?
     @State private var showingAnalytics: Bool = false
     @State private var networkMonitor = NetworkMonitor.shared
     @State private var customizingLocation: WeatherLocation?
+    @State private var navTarget: WeatherLocation?
+
+    private var repo: LocationRepository {
+        LocationRepository(modelContext: modelContext)
+    }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Offline Indicator
                 if networkMonitor.isOffline {
                     HStack {
                         Image(systemName: "wifi.slash")
@@ -46,185 +46,83 @@ struct HomeView: View {
                     .background(Color.orange.opacity(0.2))
                 }
 
-                // Segmented Control
-                Picker("Weather Data Type", selection: $selectedDataType) {
-                    ForEach(WeatherDataType.allCases, id: \.self) { type in
-                        Text(type.rawValue).tag(type)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .padding(.top, 8)
-                .onChange(of: selectedDataType) { oldValue, newValue in
-                    // Reset indices when switching data types
-                    hourlyIndex = 0
-                    dailyIndex = 0
-                }
-
-                // Time Selector Button (only shown for hourly and daily)
-                if selectedDataType != .current {
-                    TimePickerButton(currentTimeLabel: currentTimeLabel) {
-                        showingTimePicker = true
-                    }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-
                 ScrollView {
-                    LazyVStack(spacing: 16) {
+                    LazyVStack(spacing: 8) {
                         ForEach(locations) { location in
-                            if let weather = weatherViewModel.weather(for: location.id) {
-                                NavigationLink(destination: WeatherDetailView(weather: weather, location: location)) {
-                                    WeatherRowContainer(
-                                        location: location,
-                                        weather: weather,
-                                        dataType: selectedDataType,
-                                        hourlyIndex: hourlyIndex,
-                                        dailyIndex: dailyIndex,
-                                        showGrid: showWeatherGrid
-                                    )
-                                    .animation(.easeInOut(duration: 0.3), value: showWeatherGrid)
-                                    .animation(.easeInOut(duration: 0.3), value: selectedDataType)
-                                    .animation(.easeInOut(duration: 0.2), value: hourlyIndex)
-                                    .animation(.easeInOut(duration: 0.2), value: dailyIndex)
-                                }
-                                .buttonStyle(.plain)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(Color(.systemBackground))
-                                        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
-                                )
-                                .padding(.horizontal)
-                                .contextMenu {
+                            LocationCardView(
+                                location: location,
+                                snapshot: weatherViewModel.snapshot(for: location.id),
+                                onTap: { navTarget = location }
+                            )
+                            .overlay(alignment: .topTrailing) {
+                                if weatherViewModel.errorMessage(for: location.id) != nil {
                                     Button {
-                                        toggleFavorite(location)
-                                    } label: {
-                                        Label(location.isFavorite ? "Unfavorite" : "Favorite",
-                                              systemImage: location.isFavorite ? "star.slash.fill" : "star.fill")
-                                    }
-
-                                    Button {
-                                        customizingLocation = location
-                                    } label: {
-                                        Label("Customize", systemImage: "slider.horizontal.3")
-                                    }
-
-                                    Divider()
-
-                                    Button(role: .destructive) {
-                                        if let index = locations.firstIndex(where: { $0.id == location.id }) {
-                                            deleteLocations(at: IndexSet(integer: index))
+                                        if let msg = weatherViewModel.errorMessage(for: location.id) {
+                                            showError(message: msg, for: location.id)
                                         }
                                     } label: {
-                                        Label("Delete", systemImage: "trash")
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .font(.caption)
+                                            .foregroundStyle(.orange)
+                                            .padding(8)
                                     }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Show weather error")
                                 }
-                            } else if let errorMessage = weatherViewModel.errorMessage(for: location.id) {
-                                // Error card with background
-                                VStack(spacing: 12) {
-                                    HStack {
-                                        VStack(alignment: .leading) {
-                                            Text(location.displayName)
-                                                .font(.headline)
-                                            Text("Failed to load weather")
-                                                .font(.subheadline)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        Spacer()
-                                        Button {
-                                            showError(message: errorMessage, for: location.id)
-                                        } label: {
-                                            Image(systemName: "exclamationmark.triangle.fill")
-                                                .foregroundColor(.orange)
-                                        }
-                                        .buttonStyle(.plain)
-
-                                        Button {
-                                            Task {
-                                                await weatherViewModel.fetchWeather(for: location, forceRefresh: true)
-                                                if weatherViewModel.errorMessage(for: location.id) == nil {
-                                                    updateLastUpdated(location)
-                                                }
-                                            }
-                                        } label: {
-                                            Image(systemName: "arrow.clockwise")
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(Color(.systemBackground))
-                                        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
-                                )
-                                .padding(.horizontal)
-                            } else {
-                                // Loading card with background
-                                ProgressView()
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .fill(Color(.systemBackground))
-                                            .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+                            }
+                            .contextMenu {
+                                Button {
+                                    toggleFavorite(location)
+                                } label: {
+                                    Label(
+                                        location.isFavorite ? "Unfavorite" : "Favorite",
+                                        systemImage: location.isFavorite ? "star.slash.fill" : "star.fill"
                                     )
-                                    .padding(.horizontal)
-                                    .task {
-                                        await weatherViewModel.fetchWeather(for: location)
-                                        if weatherViewModel.errorMessage(for: location.id) == nil {
-                                            updateLastUpdated(location)
-                                        }
-                                    }
+                                }
+
+                                Button {
+                                    customizingLocation = location
+                                } label: {
+                                    Label("Customize", systemImage: "slider.horizontal.3")
+                                }
+
+                                Divider()
+
+                                Button(role: .destructive) {
+                                    deleteLocation(location)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                            .task {
+                                guard weatherViewModel.weather(for: location.id) == nil,
+                                      weatherViewModel.errorMessage(for: location.id) == nil
+                                else { return }
+                                await weatherViewModel.fetchWeather(for: location)
+                                if weatherViewModel.errorMessage(for: location.id) == nil {
+                                    updateLastUpdated(location)
+                                }
                             }
                         }
                     }
-                    .padding(.vertical)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
                 }
                 .background(Color(.systemGroupedBackground))
                 .refreshable {
                     await weatherViewModel.refreshAllWeather(for: locations)
-                    for location in locations {
-                        if weatherViewModel.weather(for: location.id) != nil {
-                            updateLastUpdated(location)
-                        }
-                    }
-                }
-                .onAppear {
-                    Task {
-                        await WeatherKitManager.shared.fetchWeatherSummary(latitude: 0.0, longitude: 0.0)
+                    for location in locations where weatherViewModel.weather(for: location.id) != nil {
+                        updateLastUpdated(location)
                     }
                 }
             }
             .navigationTitle("SimpleWeather")
-            .sheet(isPresented: $showingTimePicker) {
-                if let firstWeather = weatherViewModel.weatherData.values.first {
-                    TimePickerSheet(
-                        selectedDataType: $selectedDataType,
-                        hourlyIndex: $hourlyIndex,
-                        dailyIndex: $dailyIndex,
-                        selectedDay: $selectedDay,
-                        selectedHourOfDay: $selectedHourOfDay,
-                        weather: firstWeather
-                    ) {
-                        showingTimePicker = false
-                    }
-                }
-            }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
                         showingAnalytics = true
                     } label: {
                         Image(systemName: "chart.bar.fill")
-                    }
-
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showWeatherGrid.toggle()
-                        }
-                    } label: {
-                        Image(systemName: showWeatherGrid ? "square.grid.3x3.fill" : "square.grid.3x3")
-                            .contentTransition(.symbolEffect(.replace))
                     }
 
                     NavigationLink(destination: AddLocationView()) {
@@ -237,6 +135,14 @@ struct HomeView: View {
             }
             .sheet(item: $customizingLocation) { location in
                 WeatherDisplayCustomizationView(location: location)
+            }
+            .navigationDestination(item: $navTarget) { location in
+                if let weather = weatherViewModel.weather(for: location.id) {
+                    WeatherDetailView(weather: weather, location: location)
+                } else {
+                    ProgressView("Loading weather…")
+                        .task { await weatherViewModel.fetchWeather(for: location) }
+                }
             }
             .alert("Weather Error", isPresented: $showingErrorAlert) {
                 Button("OK") {
@@ -258,64 +164,26 @@ struct HomeView: View {
             } message: {
                 Text(activeErrorMessage)
             }
-        }
-    }
-
-    // MARK: - Helper Properties
-
-    private var currentTimeLabel: String {
-        guard let firstWeather = weatherViewModel.weatherData.values.first else {
-            return selectedDataType == .hourly ? "Select Hour" : "Select Day"
-        }
-
-        if selectedDataType == .hourly {
-            guard hourlyIndex < firstWeather.hourlyForecast.count else {
-                return "Select Hour"
+            .task {
+                let purged = (try? repo.purgeExpired()) ?? 0
+                if purged > 0 {
+                    print("[SimpleWeather] Auto-removed \(purged) expired location(s).")
+                }
             }
-            let hourWeather = firstWeather.hourlyForecast[hourlyIndex]
-            return WeatherDataTransformer.formatButtonDate(hourWeather.date, isHourly: true)
-        } else {
-            guard dailyIndex < firstWeather.dailyForecast.count else {
-                return "Select Day"
-            }
-            let dayWeather = firstWeather.dailyForecast[dailyIndex]
-            return WeatherDataTransformer.formatButtonDate(dayWeather.date, isHourly: false)
         }
     }
 
     // MARK: - Private Methods
 
-    /// Delete saved locations
-    private func deleteLocations(at offsets: IndexSet) {
-        for index in offsets {
-            let location = locations[index]
-            weatherViewModel.clearWeather(for: location.id)
-            modelContext.delete(location)
-        }
+    private func deleteLocation(_ location: WeatherLocation) {
+        weatherViewModel.clearWeather(for: location.id)
         do {
-            try modelContext.save()
+            try repo.delete(location)
         } catch {
-            showError(message: "Failed to delete location: \(error.localizedDescription)", for: UUID())
+            showError(message: "Failed to delete location: \(error.localizedDescription)", for: location.id)
         }
     }
 
-    /// Move/reorder locations
-    private func moveLocations(from source: IndexSet, to destination: Int) {
-        var updatedLocations = locations
-        updatedLocations.move(fromOffsets: source, toOffset: destination)
-
-        // Update display order for all locations
-        for (index, location) in updatedLocations.enumerated() {
-            location.displayOrder = index
-        }
-        do {
-            try modelContext.save()
-        } catch {
-            showError(message: "Failed to reorder locations: \(error.localizedDescription)", for: UUID())
-        }
-    }
-
-    /// Toggle favorite status
     private func toggleFavorite(_ location: WeatherLocation) {
         location.isFavorite.toggle()
         do {
@@ -325,7 +193,6 @@ struct HomeView: View {
         }
     }
 
-    /// Update last updated timestamp
     private func updateLastUpdated(_ location: WeatherLocation) {
         location.lastUpdated = Date()
         do {
@@ -335,7 +202,6 @@ struct HomeView: View {
         }
     }
 
-    /// Show error alert with message
     private func showError(message: String, for locationId: UUID) {
         activeErrorMessage = message
         activeErrorLocationId = locationId
@@ -352,26 +218,23 @@ struct HomeView: View {
 
             let context = container.mainContext
 
-            // Add San Francisco
             let sanFrancisco = WeatherLocation(
                 city: "San Francisco",
                 state: "CA",
                 latitude: 37.7749,
-                longitude: -122.4194
+                longitude: -122.4194,
+                displayOrder: 0,
+                isFavorite: true
             )
-            sanFrancisco.displayOrder = 0
-            sanFrancisco.isFavorite = true
             context.insert(sanFrancisco)
 
-            // Add New York
             let newYork = WeatherLocation(
                 city: "New York",
                 state: "NY",
                 latitude: 40.7128,
-                longitude: -74.0060
+                longitude: -74.0060,
+                displayOrder: 1
             )
-            newYork.displayOrder = 1
-            newYork.isFavorite = false
             context.insert(newYork)
 
             try? context.save()
