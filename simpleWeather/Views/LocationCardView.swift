@@ -14,16 +14,36 @@
 //
 
 import SwiftUI
+import WeatherKit
+import Playgrounds
 
 struct LocationCardView: View {
     @Bindable var location: WeatherLocation
-    /// Latest WeatherKit snapshot for this location. Pass nil while loading.
-    let snapshot: WeatherSnapshot?
+    /// Latest WeatherKit `Weather` for this location. Pass nil while loading.
+    /// The card derives its existing UI from a snapshot adapter; future
+    /// home-widgets can read fields off `weather` directly.
+    let weather: Weather?
     /// Tap to navigate to the Detail view.
     let onTap: () -> Void
 
+    private var snapshot: WeatherSnapshot? {
+        guard let weather else { return nil }
+        return WeatherSnapshot(from: weather)
+    }
+    
+    private var currentWeather: CurrentWeather? {
+        guard let weather else { return nil }
+        return weather.currentWeather
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            
+            
+//            Text(weather?.hourlyForecast[6].p)
+            
+            
+            
             headerRow
                 .contentShape(Rectangle())
                 .onTapGesture { onTap() }
@@ -59,6 +79,7 @@ struct LocationCardView: View {
 
     private var headerRow: some View {
         HStack(spacing: 12) {
+        
             Image(systemName: snapshot?.symbolName ?? "cloud.fill")
                 .font(.system(size: location.cardSize == .expanded ? 28 : 24))
                 .symbolRenderingMode(.multicolor)

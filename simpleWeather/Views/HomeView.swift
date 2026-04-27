@@ -51,7 +51,7 @@ struct HomeView: View {
                         ForEach(locations) { location in
                             LocationCardView(
                                 location: location,
-                                snapshot: weatherViewModel.snapshot(for: location.id),
+                                weather: weatherViewModel.weather(for: location.id),
                                 onTap: { navTarget = location }
                             )
                             .overlay(alignment: .topTrailing) {
