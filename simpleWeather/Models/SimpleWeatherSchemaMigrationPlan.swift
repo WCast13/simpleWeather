@@ -34,23 +34,22 @@ enum SimpleWeatherMigrationPlan: SchemaMigrationPlan {
         fromVersion: SchemaV1.self,
         toVersion: SchemaV2.self,
 
-        willMigrate: { context in
-            // Pre-flight: anything we want to read from the OLD schema before
-            // the rows are rewritten. We have nothing to do here for v1→v2;
-            // SwiftData hands us new rows already mapped from old data.
-            // Leaving this hook in place + commented for future migrations.
-            //
-            // let oldRows = try context.fetch(FetchDescriptor<SchemaV1.WeatherLocationV1>())
-            // print("Migrating \(oldRows.count) locations from v1 → v2")
+        willMigrate: { _ in
+            print("🔄 [migration] willMigrate v1 → v2")
         },
 
         didMigrate: { context in
+            print("🔄 [migration] didMigrate v1 → v2")
             // Post-migration cleanup: walk every new v2 row and patch any field
             // that wound up nil/zero because v1 stored it as Optional. The
             // context speaks v2 at this stage, so we fetch the v2-frozen
             // class (`SchemaV2.WeatherLocation`).
             let descriptor = FetchDescriptor<SchemaV2.WeatherLocation>()
-            guard let rows = try? context.fetch(descriptor) else { return }
+            guard let rows = try? context.fetch(descriptor) else {
+                print("   ⚠️ fetch failed; skipping cleanup")
+                return
+            }
+            print("   processing \(rows.count) row(s)")
 
             for row in rows {
                 // v1 dateAdded was optional. If a user had a corrupt row with
@@ -84,10 +83,10 @@ enum SimpleWeatherMigrationPlan: SchemaMigrationPlan {
         fromVersion: SchemaV2.self,
         toVersion: SchemaV3.self,
         willMigrate: { _ in
-            // Pre-flight: nothing to read from v2.
+            print("🔄 [migration] willMigrate v2 → v3")
         },
         didMigrate: { _ in
-            // Post-flight: nothing to backfill on v3.
+            print("✅ [migration] didMigrate v2 → v3")
         }
     )
 }

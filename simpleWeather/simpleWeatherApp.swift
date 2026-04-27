@@ -26,13 +26,17 @@ struct SimpleWeatherApp: App {
     let sharedModelContainer: ModelContainer
 
     init() {
+        print("🚀 ModelContainer init starting (useCloudKit=\(Self.useCloudKit))")
         do {
+            print("   ➤ Building Schema from SchemaV3…")
             let schema = Schema(versionedSchema: SchemaV3.self)
+            print("   ✓ Schema built")
 
             // CloudKit-backed config. Pass `cloudKitDatabase: .private(...)`
             // so SwiftData knows to mirror the store into the user's
             // private CloudKit DB. Do NOT enable for the simulator — use the
             // launch-arg gate below if you need a local-only run.
+            print("   ➤ Building ModelConfiguration…")
             let config = ModelConfiguration(
                 "SimpleWeather",
                 schema: schema,
@@ -41,12 +45,15 @@ struct SimpleWeatherApp: App {
                     ? .private("iCloud.wctech.simpleWeather")
                     : .none
             )
+            print("   ✓ Config built (cloudKitDatabase=\(Self.useCloudKit ? "private" : "none"))")
 
+            print("   ➤ Constructing ModelContainer with migration plan…")
             sharedModelContainer = try ModelContainer(
                 for: schema,
                 migrationPlan: SimpleWeatherMigrationPlan.self,
                 configurations: [config]
             )
+            print("   ✓ ModelContainer ready")
         } catch {
             // Fail loud. A failed migration silently falling back to
             // an in-memory store would be the worst possible outcome —
