@@ -151,14 +151,6 @@ final class WeatherViewModel {
         return weatherData[locationId]
     }
 
-    /// Adapt the cached `Weather` for a location into the `WeatherSnapshot`
-    /// value type that `LocationCardView` consumes. Returns `nil` while
-    /// loading or if the fetch failed.
-    func snapshot(for locationId: UUID) -> WeatherSnapshot? {
-        guard let weather = weatherData[locationId] else { return nil }
-        return WeatherSnapshot(from: weather)
-    }
-
     /// Check if weather is loading for a location
     func isLoading(for locationId: UUID) -> Bool {
         return loadingStates[locationId] ?? false
@@ -205,19 +197,6 @@ final class WeatherViewModel {
         return cache.getCacheTimestamp(for: locationId)
     }
 
-    /// Background refresh for all locations (non-blocking)
-    func backgroundRefreshAll(for locations: [WeatherLocation]) {
-        Task(priority: .background) {
-            await withTaskGroup(of: Void.self) { group in
-                for location in locations {
-                    group.addTask {
-                        await self.fetchWeather(for: location, forceRefresh: true)
-                    }
-                }
-            }
-        }
-    }
-
     /// Background refresh for locations with expired cache
     func backgroundRefreshExpired(for locations: [WeatherLocation]) {
         Task(priority: .background) {
@@ -229,20 +208,6 @@ final class WeatherViewModel {
                         await self.fetchWeather(for: location)
                     }
                 }
-            }
-        }
-    }
-
-    /// Schedule periodic background refresh (call from app delegate or scene)
-    func schedulePeriodicRefresh(for locations: [WeatherLocation], intervalMinutes: Int = 15) {
-        Task {
-            while true {
-                try? await Task.sleep(for: .seconds(intervalMinutes * 60))
-
-                // Only refresh if online
-                guard !networkMonitor.isOffline else { continue }
-
-                await backgroundRefreshExpired(for: locations)
             }
         }
     }

@@ -57,11 +57,6 @@ final class NetworkMonitor {
         monitor.start(queue: queue)
     }
 
-    /// Stop monitoring network status
-    func stopMonitoring() {
-        monitor.cancel()
-    }
-
     /// Check if device is online
     var isOnline: Bool {
         return isConnected

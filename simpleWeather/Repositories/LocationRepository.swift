@@ -56,7 +56,7 @@ final class LocationRepository {
         locationType: LocationType = .permanent,
         removeAt: Date? = nil
     ) async throws -> WeatherLocation {
-        let result = await GeocodeManager(address: query).forwardGeocode(address: query)
+        let result = await GeocodeManager().forwardGeocode(address: query)
 
         let zipCode = isZipCode(query) ? query : ""
         let city    = result?.addressRepresentations?.cityName ?? ""

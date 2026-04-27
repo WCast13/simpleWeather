@@ -59,17 +59,4 @@ struct CacheAnalytics: Codable {
         totalWrites = 0
         lastReset = Date()
     }
-
-    /// Get analytics summary
-    func summary() -> String {
-        """
-        Cache Analytics:
-        - Hit Rate: \(String(format: "%.1f", hitRate))%
-        - Total Hits: \(totalHits)
-        - Total Misses: \(totalMisses)
-        - Total Writes: \(totalWrites)
-        - Total Evictions: \(totalEvictions)
-        - Total Operations: \(totalOperations)
-        """
-    }
 }

@@ -139,16 +139,6 @@ final class WeatherCache {
         return !meta.isExpired
     }
 
-    /// Get time remaining until cache expires (in seconds)
-    func timeUntilExpiration(for locationId: UUID) -> TimeInterval? {
-        guard let meta = metadata[locationId] else {
-            return nil
-        }
-
-        let remaining = meta.expirationDate.timeIntervalSince(Date())
-        return remaining > 0 ? remaining : nil
-    }
-
     /// Remove expired cache entries
     func cleanupExpired() {
         let expiredKeys = metadata.filter { $0.value.isExpired }.map { $0.key }
@@ -162,16 +152,6 @@ final class WeatherCache {
             persistMetadata()
             persistAnalytics()
         }
-    }
-
-    /// Check if a location ID has persisted metadata (useful for offline mode)
-    func hasPersistedMetadata(for locationId: UUID) -> Bool {
-        return metadata[locationId] != nil
-    }
-
-    /// Get all location IDs with valid cache
-    func getAllCachedLocationIds() -> [UUID] {
-        return metadata.filter { !$0.value.isExpired }.map { $0.key }
     }
 
     /// Get current cache size

@@ -15,7 +15,6 @@
 
 import SwiftUI
 import WeatherKit
-import Playgrounds
 
 struct LocationCardView: View {
     @Bindable var location: WeatherLocation
@@ -30,20 +29,9 @@ struct LocationCardView: View {
         guard let weather else { return nil }
         return WeatherSnapshot(from: weather)
     }
-    
-    private var currentWeather: CurrentWeather? {
-        guard let weather else { return nil }
-        return weather.currentWeather
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            
-            
-//            Text(weather?.hourlyForecast[6].p)
-            
-            
-            
             headerRow
                 .contentShape(Rectangle())
                 .onTapGesture { onTap() }

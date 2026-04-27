@@ -106,20 +106,6 @@ struct WeatherDisplayPreferences: Codable {
         return visibleMetrics.contains(metric)
     }
 
-    /// Toggle visibility of a metric
-    mutating func toggleMetric(_ metric: WeatherMetric) {
-        if let index = visibleMetrics.firstIndex(of: metric) {
-            visibleMetrics.remove(at: index)
-        } else {
-            visibleMetrics.append(metric)
-        }
-    }
-
-    /// Move metric to a new position
-    mutating func moveMetric(from source: IndexSet, to destination: Int) {
-        metricsOrder.move(fromOffsets: source, toOffset: destination)
-    }
-
     /// Reset to default preferences
     mutating func reset() {
         self = .default
