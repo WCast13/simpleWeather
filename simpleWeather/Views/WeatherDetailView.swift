@@ -20,6 +20,7 @@ struct WeatherDetailView: View {
     @Bindable var location: WeatherLocation
 
     @Environment(\.modelContext) private var modelContext
+    @State private var showingLibrary = false
 
     private var repo: LocationRepository {
         LocationRepository(modelContext: modelContext)
@@ -57,9 +58,22 @@ struct WeatherDetailView: View {
                     Image(systemName: "ellipsis.circle")
                 }
 
+                Button {
+                    showingLibrary = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+
                 // Placeholder Edit affordance — Phase 4e wires it.
                 Button("Edit") {}
                     .disabled(true)
+            }
+        }
+        .sheet(isPresented: $showingLibrary) {
+            WidgetLibrarySheet { kind in
+                withAnimation(.snappy) {
+                    _ = repo.addWidget(kind, to: location)
+                }
             }
         }
     }
