@@ -13,11 +13,11 @@ import SwiftData
 enum SimpleWeatherMigrationPlan: SchemaMigrationPlan {
 
     static var schemas: [any VersionedSchema.Type] {
-        [SchemaV1.self, SchemaV2.self]
+        [SchemaV1.self, SchemaV2.self, SchemaV3.self]
     }
 
     static var stages: [MigrationStage] {
-        [migrateV1toV2]
+        [migrateV1toV2, migrateV2toV3]
     }
 
     // MARK: - V1 → V2 ----------------------------------------------------------
@@ -45,9 +45,11 @@ enum SimpleWeatherMigrationPlan: SchemaMigrationPlan {
         },
 
         didMigrate: { context in
-            // Post-migration cleanup: walk every new row and patch any field
-            // that wound up nil/zero because v1 stored it as Optional.
-            let descriptor = FetchDescriptor<WeatherLocation>()
+            // Post-migration cleanup: walk every new v2 row and patch any field
+            // that wound up nil/zero because v1 stored it as Optional. Note
+            // we fetch SchemaV2.WeatherLocationV2 (the frozen v2 class) — at
+            // this stage the context speaks v2, not v3.
+            let descriptor = FetchDescriptor<SchemaV2.WeatherLocationV2>()
             guard let rows = try? context.fetch(descriptor) else { return }
 
             for row in rows {
@@ -59,12 +61,23 @@ enum SimpleWeatherMigrationPlan: SchemaMigrationPlan {
                 // displayOrder was optional. Anything ≤ 0 from v1 is fine
                 // to leave; we just sort on it. No change needed.
 
-                // Brand-new fields all picked up their `= default` values
+                // Brand-new v2 fields all picked up their `= default` values
                 // from the @Model declaration. Nothing to backfill.
                 _ = row
             }
 
             try? context.save()
         }
+    )
+
+    // MARK: - V2 → V3 ----------------------------------------------------------
+
+    /// Lightweight: v3 only adds the `widgets` to-many relationship on
+    /// WeatherLocation (default empty) and introduces the WidgetSpec model.
+    /// SwiftData handles the relationship-add automatically — no row-level
+    /// work, no data transformation. Existing v2 stores upgrade in place.
+    static let migrateV2toV3 = MigrationStage.lightweight(
+        fromVersion: SchemaV2.self,
+        toVersion: SchemaV3.self
     )
 }

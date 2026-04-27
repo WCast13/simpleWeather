@@ -1,9 +1,15 @@
 //
-//  WeatherLocation.swift  (SchemaV2 — drop-in replacement)
+//  WeatherLocation.swift  (SchemaV3 — active)
 //  simpleWeather
 //
-//  v1 → v2 migration: collapse optionals, add locationType + removeAt + cardSize,
-//  prepare for CloudKit sync. Read CLOUDKIT-RULES.md before changing this file.
+//  Schema versioning evolution:
+//   v1 — original optional bag (frozen as SchemaV1.WeatherLocationV1)
+//   v2 — collapsed optionals + cardSize / locationType / removeAt + CloudKit
+//        (frozen as SchemaV2.WeatherLocationV2)
+//   v3 — adds the `widgets` relationship for per-location Detail layouts
+//        (active, this file's `WeatherLocation`)
+//
+//  Read CLOUDKIT-RULES.md before changing this file.
 //
 
 import Foundation
@@ -12,15 +18,16 @@ import CoreLocation
 
 // MARK: - Schema versioning -----------------------------------------------------
 
-/// Old schema, kept around so SwiftData can read existing on-device stores
-/// during the migration. DO NOT edit — it must match what shipped.
+/// Frozen v1 schema. Kept around so SwiftData can read existing on-device v1
+/// stores during the migration. DO NOT edit — must match what shipped.
 enum SchemaV1: VersionedSchema {
     static var versionIdentifier = Schema.Version(1, 0, 0)
     static var models: [any PersistentModel.Type] {
         [WeatherLocationV1.self]
     }
 
-    /// The original v1 model. Note the all-optional bag — that's what's on disk today.
+    /// The original v1 model. All-optional bag — that's what's on disk for
+    /// any user who shipped before the v2 migration ran.
     @Model
     final class WeatherLocationV1 {
         var id: UUID = UUID()
@@ -43,11 +50,47 @@ enum SchemaV1: VersionedSchema {
     }
 }
 
-/// New schema. This is the one you'll write code against.
+/// Frozen v2 schema. Kept around so SwiftData can read v2 stores during the
+/// v2 → v3 migration. DO NOT edit — must match what shipped in Phase 1.
 enum SchemaV2: VersionedSchema {
     static var versionIdentifier = Schema.Version(2, 0, 0)
     static var models: [any PersistentModel.Type] {
-        [WeatherLocation.self]
+        [WeatherLocationV2.self]
+    }
+
+    /// The v2 model exactly as it shipped. No `widgets` relationship — that's
+    /// what v3 adds. Stored properties only; computed accessors are not needed
+    /// for migration purposes.
+    @Model
+    final class WeatherLocationV2 {
+        var id: UUID = UUID()
+        var city: String = ""
+        var state: String = ""
+        var zipCode: String = ""
+        var latitude: Double = 0
+        var longitude: Double = 0
+        var dateAdded: Date = Date()
+        var lastUpdated: Date?
+        var displayOrder: Int = 0
+        var isFavorite: Bool = false
+        var cardSizeRaw: Int = 0
+        var locationTypeRaw: Int = 0
+        var removeAt: Date?
+
+        @Attribute(.externalStorage)
+        var displayPreferencesData: Data?
+
+        init() {}
+    }
+}
+
+/// Active v3 schema. Adds `widgets` relationship to WeatherLocation; introduces
+/// the WidgetSpec model. The v2 → v3 migration is lightweight (a relationship-add
+/// with a default-empty array on the parent side, no row-level work).
+enum SchemaV3: VersionedSchema {
+    static var versionIdentifier = Schema.Version(3, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        [WeatherLocation.self, WidgetSpec.self]
     }
 }
 
@@ -85,7 +128,7 @@ enum CardSize: Int, Codable, CaseIterable, Sendable {
     }
 }
 
-// MARK: - The model itself ------------------------------------------------------
+// MARK: - The active model (v3) -------------------------------------------------
 
 /// A saved place the user wants weather for.
 ///
@@ -94,9 +137,7 @@ enum CardSize: Int, Codable, CaseIterable, Sendable {
 ///    "required, no default" — first sync will fail without one.
 /// 2. No `@Attribute(.unique)`. CloudKit doesn't enforce uniqueness; SwiftData
 ///    refuses to add the constraint when the container is CloudKit-backed.
-/// 3. Relationships (none yet, but coming for `widgets`) must have an explicit
-///    inverse. Add `@Relationship(deleteRule: .cascade, inverse: \.location)`
-///    when you wire WidgetSpec.
+/// 3. Relationships have an explicit inverse (see `widgets` below).
 @Model
 final class WeatherLocation {
 
@@ -126,14 +167,14 @@ final class WeatherLocation {
     /// Pinned by user.
     var isFavorite: Bool = false
 
-    // MARK: New in v2 — Home view behavior
+    // MARK: Home view behavior (v2)
     /// Stored as Int for CloudKit-friendliness. Use the computed `cardSize`
     /// accessor below instead of touching this directly.
     /// Literal default (must match `CardSize.compact.rawValue`); SwiftData's
     /// `@Model` macro can't resolve enum `.rawValue` at expansion time.
     var cardSizeRaw: Int = 0
 
-    // MARK: New in v2 — Lifecycle classification
+    // MARK: Lifecycle classification (v2)
     /// Literal default (must match `LocationType.permanent.rawValue`).
     var locationTypeRaw: Int = 0
     /// Auto-purge target for temporary locations. Sweep on launch.
@@ -141,10 +182,16 @@ final class WeatherLocation {
     var removeAt: Date?
 
     // MARK: Per-location display preferences (carried over from v1, commit 5c4064d)
-    /// Encoded `WeatherDisplayPreferences`. Phase 4 may supersede this with
-    /// `WidgetSpec`; until then, keep it working. Optional, so Rule 1 satisfied.
+    /// Encoded `WeatherDisplayPreferences`. Optional, so Rule 1 satisfied.
     @Attribute(.externalStorage)
     var displayPreferencesData: Data?
+
+    // MARK: Detail-view layout (v3, NEW)
+    /// Per-location ordered list of widgets shown on the Detail screen.
+    /// Cascade-delete: removing a location removes its widgets.
+    /// Inverse points back at `WidgetSpec.location` (RULE 03).
+    @Relationship(deleteRule: .cascade, inverse: \WidgetSpec.location)
+    var widgets: [WidgetSpec] = []
 
     // MARK: Init
 
@@ -174,6 +221,7 @@ final class WeatherLocation {
         self.locationTypeRaw = locationType.rawValue
         self.removeAt = removeAt
         self.displayPreferencesData = nil
+        // `widgets` defaults to [] from the property declaration.
     }
 
     // MARK: Computed accessors
@@ -215,5 +263,10 @@ final class WeatherLocation {
         set {
             displayPreferencesData = try? JSONEncoder().encode(newValue)
         }
+    }
+
+    /// `widgets` sorted by `displayOrder`. Use this when rendering the Detail grid.
+    var widgetsInOrder: [WidgetSpec] {
+        widgets.sorted { $0.displayOrder < $1.displayOrder }
     }
 }

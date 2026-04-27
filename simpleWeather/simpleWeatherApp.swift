@@ -27,7 +27,7 @@ struct SimpleWeatherApp: App {
 
     init() {
         do {
-            let schema = Schema(versionedSchema: SchemaV2.self)
+            let schema = Schema(versionedSchema: SchemaV3.self)
 
             // CloudKit-backed config. Pass `cloudKitDatabase: .private(...)`
             // so SwiftData knows to mirror the store into the user's

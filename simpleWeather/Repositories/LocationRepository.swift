@@ -156,4 +156,57 @@ final class LocationRepository {
     private func isZipCode(_ input: String) -> Bool {
         input.range(of: #"^\d{5}(-\d{4})?$"#, options: .regularExpression) != nil
     }
+
+    // MARK: - Widgets (Phase 4)
+
+    /// Replace the location's widgets with the contents of a preset.
+    /// Existing widgets are deleted (cascade — they're WidgetSpec rows owned
+    /// by `location.widgets`).
+    func applyPreset(_ preset: LayoutPreset, to location: WeatherLocation) {
+        for widget in location.widgets {
+            modelContext.delete(widget)
+        }
+        for (index, item) in preset.items.enumerated() {
+            let spec = WidgetSpec(kind: item.kind, size: item.size, displayOrder: index)
+            spec.location = location
+            modelContext.insert(spec)
+        }
+        try? modelContext.save()
+    }
+
+    /// Append a widget at the end of the location's grid using the catalog's
+    /// default size for that kind.
+    @discardableResult
+    func addWidget(_ kind: WidgetKind, to location: WeatherLocation) -> WidgetSpec {
+        let defaultSize = WidgetCatalog.entry(for: kind)?.defaultSize ?? .oneByOne
+        let nextOrder = (location.widgets.map(\.displayOrder).max() ?? -1) + 1
+        let spec = WidgetSpec(kind: kind, size: defaultSize, displayOrder: nextOrder)
+        spec.location = location
+        modelContext.insert(spec)
+        try? modelContext.save()
+        return spec
+    }
+
+    /// Remove a widget. Caller usually animates the row out before invoking.
+    func removeWidget(_ widget: WidgetSpec) {
+        modelContext.delete(widget)
+        try? modelContext.save()
+    }
+
+    /// Set the size of a widget. Caller is responsible for ensuring the size
+    /// is in the catalog's `allowedSizes` for that kind — repository doesn't
+    /// validate (the edit-mode resize gesture in Phase 4e will).
+    func setWidgetSize(_ widget: WidgetSpec, _ size: WidgetSize) {
+        widget.sizeRaw = size.rawValue
+        try? modelContext.save()
+    }
+
+    /// Rewrite `displayOrder` on every widget in `widgets` to match its
+    /// position in the array. Used by drag-to-reorder once Phase 4e wires it.
+    func reorderWidgets(_ widgets: [WidgetSpec]) {
+        for (index, widget) in widgets.enumerated() {
+            widget.displayOrder = index
+        }
+        try? modelContext.save()
+    }
 }
