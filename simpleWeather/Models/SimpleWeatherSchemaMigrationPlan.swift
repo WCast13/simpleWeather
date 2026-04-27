@@ -46,10 +46,10 @@ enum SimpleWeatherMigrationPlan: SchemaMigrationPlan {
 
         didMigrate: { context in
             // Post-migration cleanup: walk every new v2 row and patch any field
-            // that wound up nil/zero because v1 stored it as Optional. Note
-            // we fetch SchemaV2.WeatherLocationV2 (the frozen v2 class) — at
-            // this stage the context speaks v2, not v3.
-            let descriptor = FetchDescriptor<SchemaV2.WeatherLocationV2>()
+            // that wound up nil/zero because v1 stored it as Optional. The
+            // context speaks v2 at this stage, so we fetch the v2-frozen
+            // class (`SchemaV2.WeatherLocation`).
+            let descriptor = FetchDescriptor<SchemaV2.WeatherLocation>()
             guard let rows = try? context.fetch(descriptor) else { return }
 
             for row in rows {
