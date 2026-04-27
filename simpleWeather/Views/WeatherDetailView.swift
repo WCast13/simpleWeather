@@ -1,378 +1,278 @@
 //
-//  WeatherDetailView.swift
+//  WeatherDetailView.swift  (Phase 4c — read-only widget grid)
 //  simpleWeather
 //
-//  Created by William Castellano on 2/7/25.
+//  v2 keystone: each location has a per-location grid of widgets that the
+//  user customizes. Phase 4c lays out the grid read-only with placeholder
+//  cells; Phase 4d ports per-widget renderers from the design refs;
+//  Phase 4e adds drag-reorder / resize / + add edit mode.
+//
+//  The `weather` argument stays in the signature even though Phase 4c's
+//  placeholder cells don't consume it — Phase 4d's real renderers will.
 //
 
 import SwiftUI
 import WeatherKit
+import SwiftData
 
 struct WeatherDetailView: View {
     let weather: Weather
-    let location: WeatherLocation
+    @Bindable var location: WeatherLocation
+
+    @Environment(\.modelContext) private var modelContext
+
+    private var repo: LocationRepository {
+        LocationRepository(modelContext: modelContext)
+    }
+
+    private var widgets: [WidgetSpec] { location.widgetsInOrder }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Current Weather Section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(location.displayName)
-                        .font(.title)
-                        .bold()
+        ZStack {
+            DetailSkyBackground()
 
-                    HStack {
-                        Image(systemName: weather.currentWeather.symbolName)
-                            .font(.system(size: 60))
-                            .symbolRenderingMode(.multicolor)
-
-                        VStack(alignment: .leading) {
-                            Text("\(Int(weather.currentWeather.temperature.converted(to: .fahrenheit).value))°F")
-                                .font(.system(size: 48, weight: .bold))
-
-                            Text(weather.currentWeather.condition.description)
-                                .font(.title3)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-                    }
-                    .padding(.vertical)
-                }
-                .padding(.horizontal)
-
-                Divider()
-
-                // Hourly Forecast Section
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Hourly Forecast")
-                        .font(.headline)
-                        .padding(.horizontal)
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 16) {
-                            ForEach(Array(weather.hourlyForecast), id: \.date) { hourWeather in
-                                HourlyForecastCard(hourWeather: hourWeather)
+            if widgets.isEmpty {
+                emptyState
+            } else {
+                widgetGrid
+            }
+        }
+        .navigationTitle(location.displayName)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Menu {
+                    Section("Apply layout preset") {
+                        ForEach(LayoutPresets.all) { preset in
+                            Button {
+                                withAnimation(.snappy) {
+                                    repo.applyPreset(preset, to: location)
+                                }
+                            } label: {
+                                Label(preset.displayName, systemImage: preset.symbolName)
                             }
                         }
-                        .padding(.horizontal)
                     }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
 
-                Divider()
-
-                // Current Conditions Details
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Current Conditions")
-                        .font(.headline)
-                        .padding(.horizontal)
-
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: 16) {
-                        WeatherMetricCard(
-                            title: "Feels Like",
-                            value: "\(Int(weather.currentWeather.apparentTemperature.converted(to: .fahrenheit).value))°F",
-                            icon: "thermometer"
-                        )
-
-                        WeatherMetricCard(
-                            title: "Humidity",
-                            value: "\(Int(weather.currentWeather.humidity * 100))%",
-                            icon: "humidity"
-                        )
-
-                        WeatherMetricCard(
-                            title: "Wind",
-                            value: "\(Int(weather.currentWeather.wind.speed.converted(to: .milesPerHour).value)) mph",
-                            icon: "wind"
-                        )
-
-                        WeatherMetricCard(
-                            title: "UV Index",
-                            value: "\(weather.currentWeather.uvIndex.value)",
-                            icon: "sun.max"
-                        )
-
-                        WeatherMetricCard(
-                            title: "Visibility",
-                            value: String(format: "%.1f mi", weather.currentWeather.visibility.converted(to: .miles).value),
-                            icon: "eye"
-                        )
-
-                        WeatherMetricCard(
-                            title: "Pressure",
-                            value: String(format: "%.2f inHg", weather.currentWeather.pressure.converted(to: .inchesOfMercury).value),
-                            icon: "gauge"
-                        )
-                    }
-                    .padding(.horizontal)
-                }
-
-                Divider()
-
-                // Daily Forecast Section
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("10-Day Forecast")
-                        .font(.headline)
-                        .padding(.horizontal)
-
-                    ForEach(Array(weather.dailyForecast.prefix(10)), id: \.date) { dailyWeather in
-                        DailyForecastRow(dailyWeather: dailyWeather)
-                            .padding(.horizontal)
-                    }
-                }
-
-                Spacer(minLength: 20)
-            }
-            .padding(.vertical)
-        }
-        .onAppear() {
-            print(weather.currentWeather.cloudCoverByAltitude.high.description)
-            print(weather.currentWeather.cloudCoverByAltitude.medium.description)
-            print(weather.currentWeather.cloudCoverByAltitude.low.description)
-        }
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-// MARK: - Hourly Forecast Card
-struct HourlyForecastCard: View {
-    let hourWeather: HourWeather
-
-    private var timeString: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "ha"
-        return formatter.string(from: hourWeather.date)
-    }
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Text(timeString)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Image(systemName: hourWeather.symbolName)
-                .font(.title2)
-                .symbolRenderingMode(.multicolor)
-
-            Text("\(Int(hourWeather.temperature.converted(to: .fahrenheit).value))°")
-                .font(.body)
-                .bold()
-
-            if hourWeather.precipitationChance > 0 {
-                HStack(spacing: 2) {
-                    Image(systemName: "drop.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.blue)
-                    Text("\(Int(hourWeather.precipitationChance * 100))%")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+                // Placeholder Edit affordance — Phase 4e wires it.
+                Button("Edit") {}
+                    .disabled(true)
             }
         }
-        .frame(width: 60)
-        .padding(.vertical, 8)
-        .background(Color.secondary.opacity(0.1))
-        .cornerRadius(12)
-    }
-}
-
-// MARK: - Weather Metric Card
-struct WeatherMetricCard: View {
-    let title: String
-    let value: String
-    let icon: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundStyle(.secondary)
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Text(value)
-                .font(.title3)
-                .bold()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.secondary.opacity(0.1))
-        .cornerRadius(12)
-    }
-}
-
-// MARK: - Daily Forecast Row
-struct DailyForecastRow: View {
-    let dailyWeather: DayWeather
-
-    private var dayString: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE"
-        return formatter.string(from: dailyWeather.date)
     }
 
-    var body: some View {
-        HStack {
-            Text(dayString)
-                .font(.body)
-                .frame(width: 100, alignment: .leading)
+    // MARK: - Empty state
 
-            Image(systemName: dailyWeather.symbolName)
-                .font(.title3)
-                .symbolRenderingMode(.multicolor)
-                .frame(width: 40)
-
-            if dailyWeather.precipitationChance > 0 {
-                HStack(spacing: 2) {
-                    Image(systemName: "drop.fill")
-                        .font(.caption)
-                        .foregroundStyle(.blue)
-                    Text("\(Int(dailyWeather.precipitationChance * 100))%")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+    private var emptyState: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                VStack(spacing: 8) {
+                    Image(systemName: "rectangle.3.group")
+                        .font(.system(size: 48, weight: .light))
+                        .foregroundStyle(.tertiary)
+                    Text("Customize \(location.displayName)")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(Color(red: 0x0E/255, green: 0x1A/255, blue: 0x2B/255))
+                    Text("Pick a starting layout to fill this screen with the weather data you care about. You can rearrange and swap widgets later from the Edit menu.")
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(Color(red: 0x0E/255, green: 0x1A/255, blue: 0x2B/255).opacity(0.55))
+                        .padding(.horizontal)
                 }
-                .frame(width: 50)
+                .padding(.top, 60)
+
+                VStack(spacing: 12) {
+                    ForEach(LayoutPresets.all) { preset in
+                        Button {
+                            withAnimation(.snappy) {
+                                repo.applyPreset(preset, to: location)
+                            }
+                        } label: {
+                            PresetRow(preset: preset)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 32)
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    // MARK: - Widget grid (4-column, read-only)
+    //
+    // For now packed greedily by width. Heights are visual only (no row-spanning
+    // widgets in SwiftUI's `Grid` — `gridCellRows` doesn't exist). 4x2 / 2x2
+    // widgets render visually taller via fixed cell minHeight, but neighbors
+    // in the same Grid row size to the tallest cell. Phase 4e will move to a
+    // proper 2D-packing custom Layout when drag/resize gestures need it.
+
+    private var widgetGrid: some View {
+        ScrollView {
+            Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+                ForEach(packedRows.indices, id: \.self) { rowIdx in
+                    GridRow {
+                        ForEach(packedRows[rowIdx]) { widget in
+                            WidgetCellPlaceholder(widget: widget)
+                                .gridCellColumns(widget.size.width)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+    }
+
+    /// Greedy width-only packing into 4-column rows. Works perfectly for the
+    /// just-weather and boating presets (they're designed to tile cleanly);
+    /// photography leaves a 2-column gap on one row, which is faithful to its
+    /// preset definition.
+    private var packedRows: [[WidgetSpec]] {
+        let columnCount = 4
+        var rows: [[WidgetSpec]] = []
+        var current: [WidgetSpec] = []
+        var used = 0
+        for widget in widgets {
+            let w = widget.size.width
+            if used + w > columnCount {
+                rows.append(current)
+                current = [widget]
+                used = w
             } else {
+                current.append(widget)
+                used += w
+                if used == columnCount {
+                    rows.append(current)
+                    current = []
+                    used = 0
+                }
+            }
+        }
+        if !current.isEmpty { rows.append(current) }
+        return rows
+    }
+}
+
+// MARK: - Sky-to-haze gradient ------------------------------------------------
+
+/// Detail-view background per the proto spec:
+/// `linear-gradient(180deg, #B8DDF5 0%, #DCEDF8 35%, #F4F6F8 100%)`
+private struct DetailSkyBackground: View {
+    var body: some View {
+        LinearGradient(
+            stops: [
+                .init(color: Color(red: 0xB8/255, green: 0xDD/255, blue: 0xF5/255), location: 0.00),
+                .init(color: Color(red: 0xDC/255, green: 0xED/255, blue: 0xF8/255), location: 0.35),
+                .init(color: Color(red: 0xF4/255, green: 0xF6/255, blue: 0xF8/255), location: 1.00),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
+    }
+}
+
+// MARK: - Widget cell placeholder --------------------------------------------
+
+/// Phase 4c stand-in cell. Each catalog kind uses the same generic visual
+/// (label + size badge + "Phase 4d" tag). Phase 4d replaces this with a
+/// switch over `widget.kind` rendering each widget's real content.
+struct WidgetCellPlaceholder: View {
+    let widget: WidgetSpec
+
+    private static let primary = Color(red: 0x0E/255, green: 0x1A/255, blue: 0x2B/255)
+    private static let dim     = Color(red: 0x0E/255, green: 0x1A/255, blue: 0x2B/255).opacity(0.55)
+    private static let faint   = Color(red: 0x0E/255, green: 0x1A/255, blue: 0x2B/255).opacity(0.30)
+
+    var body: some View {
+        let entry = widget.catalogEntry
+
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                if let entry {
+                    Image(systemName: entry.symbolName)
+                        .font(.caption)
+                        .foregroundStyle(Self.dim)
+                    Text(entry.displayName.uppercased())
+                        .font(.caption2.weight(.semibold))
+                        .tracking(0.6)
+                        .foregroundStyle(Self.faint)
+                        .lineLimit(1)
+                }
                 Spacer()
-                    .frame(width: 50)
+                Text(widget.sizeRaw)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(Self.faint)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Self.faint.opacity(0.15), in: .capsule)
             }
 
             Spacer()
 
-            HStack(spacing: 8) {
-                Text("\(Int(dailyWeather.lowTemperature.converted(to: .fahrenheit).value))°")
-                    .foregroundStyle(.secondary)
-
-                Text("\(Int(dailyWeather.highTemperature.converted(to: .fahrenheit).value))°")
-                    .bold()
+            HStack {
+                Spacer()
+                Text("Phase 4d")
+                    .font(.caption2)
+                    .foregroundStyle(Self.faint)
             }
         }
-        .padding(.vertical, 8)
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: cellHeight, alignment: .topLeading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.5), lineWidth: 0.5)
+        }
+        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+    }
+
+    /// Approximate the proto's row-height grid: 84pt per row unit.
+    private var cellHeight: CGFloat {
+        CGFloat(widget.size.height) * 84
     }
 }
 
-// MARK: - Previews
+// MARK: - Preset row (empty state) -------------------------------------------
 
-// Preview helper to load weather data
-struct WeatherPreviewWrapper: View {
-    @State private var weather: Weather?
-    @State private var isLoading = true
-
-    let location: WeatherLocation
+private struct PresetRow: View {
+    let preset: LayoutPreset
 
     var body: some View {
-        Group {
-            if isLoading {
-                ProgressView("Loading weather data...")
-            } else if let weather = weather {
-                WeatherDetailView(weather: weather, location: location)
-            } else {
-                Text("Failed to load weather data")
-                    .foregroundStyle(.secondary)
+        HStack(spacing: 14) {
+            Image(systemName: preset.symbolName)
+                .font(.title2)
+                .foregroundStyle(.tint)
+                .frame(width: 44, height: 44)
+                .background(.tint.opacity(0.12), in: .circle)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(preset.displayName)
+                    .font(.headline)
+                    .foregroundStyle(Color(red: 0x0E/255, green: 0x1A/255, blue: 0x2B/255))
+                Text(preset.summary)
+                    .font(.caption)
+                    .foregroundStyle(Color(red: 0x0E/255, green: 0x1A/255, blue: 0x2B/255).opacity(0.55))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
             }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color(red: 0x0E/255, green: 0x1A/255, blue: 0x2B/255).opacity(0.30))
         }
-        .task {
-            await loadWeather()
-        }
-    }
-
-    private func loadWeather() async {
-        do {
-            weather = try await WeatherKitManager.shared.fetchWeather(
-                latitude: location.latitude,
-                longitude: location.longitude
-            )
-            isLoading = false
-        } catch {
-            print("Preview error: \(error)")
-            isLoading = false
-        }
-    }
-}
-
-#Preview("Weather Detail View") {
-    NavigationStack {
-        WeatherPreviewWrapper(
-            location: WeatherLocation(
-                city: "San Francisco",
-                state: "CA",
-                latitude: 37.7749,
-                longitude: -122.4194
-            )
-        )
-    }
-}
-
-#Preview("Hourly Forecast Card") {
-    HourlyForecastCardPreview()
-}
-
-#Preview("Weather Metric Card") {
-    WeatherMetricCard(
-        title: "Humidity",
-        value: "65%",
-        icon: "humidity"
-    )
-    .padding()
-    .frame(width: 200)
-}
-
-#Preview("Daily Forecast Row") {
-    DailyForecastRowPreview()
-}
-
-// MARK: - Component Preview Helpers
-private struct HourlyForecastCardPreview: View {
-    @State private var weather: Weather?
-
-    var body: some View {
-        Group {
-            if let hourWeather = weather?.hourlyForecast.first {
-                HourlyForecastCard(hourWeather: hourWeather)
-                    .padding()
-            } else {
-                ProgressView()
-            }
-        }
-        .task {
-            do {
-                weather = try await WeatherKitManager.shared.fetchWeather(
-                    latitude: 37.7749,
-                    longitude: -122.4194
-                )
-            } catch {
-                print("Preview error: \(error)")
-            }
-        }
-    }
-}
-
-private struct DailyForecastRowPreview: View {
-    @State private var weather: Weather?
-
-    var body: some View {
-        Group {
-            if let dailyWeather = weather?.dailyForecast.first {
-                DailyForecastRow(dailyWeather: dailyWeather)
-                    .padding()
-            } else {
-                ProgressView()
-            }
-        }
-        .task {
-            do {
-                weather = try await WeatherKitManager.shared.fetchWeather(
-                    latitude: 37.7749,
-                    longitude: -122.4194
-                )
-            } catch {
-                print("Preview error: \(error)")
-            }
+        .padding(14)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.5), lineWidth: 0.5)
         }
     }
 }
