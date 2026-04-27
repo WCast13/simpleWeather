@@ -51,6 +51,20 @@ struct SimpleWeatherApp: App {
             // Fail loud. A failed migration silently falling back to
             // an in-memory store would be the worst possible outcome —
             // the user thinks the app works, then their data vanishes.
+            //
+            // Print the full error chain to the console first; SwiftData's
+            // top-level `loadIssueModelContainer` is a generic envelope and
+            // hides the real cause.
+            print("❌ ModelContainer init failed")
+            print("   error: \(error)")
+            print("   localizedDescription: \(error.localizedDescription)")
+            let nsError = error as NSError
+            print("   domain: \(nsError.domain)  code: \(nsError.code)")
+            print("   userInfo:")
+            for (k, v) in nsError.userInfo { print("     \(k) = \(v)") }
+            if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
+                print("   underlying: \(underlying)")
+            }
             fatalError("ModelContainer init failed: \(error)")
         }
     }

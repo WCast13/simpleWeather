@@ -72,12 +72,22 @@ enum SimpleWeatherMigrationPlan: SchemaMigrationPlan {
 
     // MARK: - V2 → V3 ----------------------------------------------------------
 
-    /// Lightweight: v3 only adds the `widgets` to-many relationship on
-    /// WeatherLocation (default empty) and introduces the WidgetSpec model.
-    /// SwiftData handles the relationship-add automatically — no row-level
-    /// work, no data transformation. Existing v2 stores upgrade in place.
-    static let migrateV2toV3 = MigrationStage.lightweight(
+    /// Custom (with empty hooks) rather than lightweight. Lightweight refuses
+    /// to handle the implicit class rename across versions
+    /// (`WeatherLocation` on the v2 disk → `SchemaV2.WeatherLocationV2` in
+    /// declarations → top-level `WeatherLocation` in v3). Custom lets
+    /// SwiftData treat the rename as an explicit version transition.
+    ///
+    /// Structurally v3 only adds the `widgets` relationship (default empty)
+    /// and introduces `WidgetSpec`. No row work needed.
+    static let migrateV2toV3 = MigrationStage.custom(
         fromVersion: SchemaV2.self,
-        toVersion: SchemaV3.self
+        toVersion: SchemaV3.self,
+        willMigrate: { _ in
+            // Pre-flight: nothing to read from v2.
+        },
+        didMigrate: { _ in
+            // Post-flight: nothing to backfill on v3.
+        }
     )
 }
