@@ -164,8 +164,15 @@ extension SchemaV3 {
         // MARK: Detail-view layout (v3)
         /// Cascade-delete: removing the location removes its widgets.
         /// Inverse declared on `WidgetSpec.location` (CloudKit RULE 03).
+        ///
+        /// Declared as optional `[WidgetSpec]?` rather than `[WidgetSpec] = []`
+        /// because CloudKit (CoreData under the hood) refuses to load the
+        /// store otherwise: "CloudKit integration requires that all
+        /// relationships be optional". This applies to to-many parent sides
+        /// too, not just to-one inverses — see CLOUDKIT-RULES.md → Rule 5.
+        /// Use `widgetsInOrder` to read.
         @Relationship(deleteRule: .cascade, inverse: \WidgetSpec.location)
-        var widgets: [WidgetSpec] = []
+        var widgets: [WidgetSpec]?
 
         // MARK: Init
 
@@ -240,9 +247,11 @@ extension SchemaV3 {
             }
         }
 
-        /// `widgets` sorted by `displayOrder`. Use this when rendering the Detail grid.
+        /// `widgets` sorted by `displayOrder`. Use this when rendering the
+        /// Detail grid; folds the CloudKit-mandated optional into a stable
+        /// non-optional array.
         var widgetsInOrder: [WidgetSpec] {
-            widgets.sorted { $0.displayOrder < $1.displayOrder }
+            (widgets ?? []).sorted { $0.displayOrder < $1.displayOrder }
         }
     }
 

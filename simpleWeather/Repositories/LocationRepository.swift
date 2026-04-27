@@ -163,7 +163,7 @@ final class LocationRepository {
     /// Existing widgets are deleted (cascade — they're WidgetSpec rows owned
     /// by `location.widgets`).
     func applyPreset(_ preset: LayoutPreset, to location: WeatherLocation) {
-        for widget in location.widgets {
+        for widget in location.widgets ?? [] {
             modelContext.delete(widget)
         }
         for (index, item) in preset.items.enumerated() {
@@ -179,7 +179,7 @@ final class LocationRepository {
     @discardableResult
     func addWidget(_ kind: WidgetKind, to location: WeatherLocation) -> WidgetSpec {
         let defaultSize = WidgetCatalog.entry(for: kind)?.defaultSize ?? .oneByOne
-        let nextOrder = (location.widgets.map(\.displayOrder).max() ?? -1) + 1
+        let nextOrder = ((location.widgets ?? []).map(\.displayOrder).max() ?? -1) + 1
         let spec = WidgetSpec(kind: kind, size: defaultSize, displayOrder: nextOrder)
         spec.location = location
         modelContext.insert(spec)

@@ -33,9 +33,15 @@ local store works but nothing reaches iCloud.
    reorder we rewrite all of them. SwiftData syncs ints fine; arrays
    reordered in place don't.
 
-5. **No required to-one relationships across the boundary.**
-   `var location: WeatherLocation?` (optional) on the owned side.
-   Required to-ones cause first-sync failures.
+5. **All relationships must be optional — both sides.**
+   `var location: WeatherLocation?` on the owned (to-one) side.
+   AND `var widgets: [WidgetSpec]?` on the owning (to-many) side. CoreData
+   refuses to load the store otherwise with "CloudKit integration requires
+   that all relationships be optional" — and this includes the to-many
+   parent side, not just to-one inverses, even though `[X] = []` looks
+   syntactically reasonable. Use a `…InOrder` computed accessor to fold
+   the optional back to a stable non-optional array for callers
+   (see `WeatherLocation.widgetsInOrder`).
 
 ## Operational gotchas
 
